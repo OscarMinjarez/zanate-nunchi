@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "zanatenunchi",
+	"version": "${version}",
+	"name": "Zanate Nunchi",
+	"description": "Tu compa\u00f1ero IA que observa, analiza y reacciona al mundo de Minecraft usando Llama.",
+	"authors": [
+		"Adenium Sae"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/zanatenunchi/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.adenium.zanatenunchi.ZanateNunchiMod"
+		],
+		"client": [
+			"com.adenium.zanatenunchi.ZanateNunchiClient"
+		]
+	},
+	"mixins": [
+		"zanatenunchi.mixins.json",
+		{
+			"config": "zanatenunchi.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.2",
+		"minecraft": "~1.21.6",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
