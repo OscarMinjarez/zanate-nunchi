@@ -4,33 +4,35 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Mapea los códigos de idioma de Minecraft a instrucciones de regionalismo para la IA.
+ * Mapea códigos de idioma de Minecraft a perfiles de lenguaje usados por los prompts de IA.
  */
 public class LanguageManager {
 
     private static final Map<String, LanguageProfile> PROFILES = new HashMap<>();
     
     static {
+        PROFILES.put("default", new LanguageProfile(
+            "default", "Español formal internacional", "español formal internacional",
+            "Habla en español neutro, formal y estratégico. Mantén claridad y precisión."
+        ));
+
         // Español - Variantes
         PROFILES.put("es_mx", new LanguageProfile(
             "es_mx", "Español (México)", "español mexicano",
-            "Habla en español natural de México. Tutea. " +
-            "Evita expresiones de España ('tío', 'mola', 'vosotros'). " +
-            "Usa registro coloquial neutro y claro. " +
-            "No caricaturices el habla regional ni abuses de muletillas. " +
-            "Si usas modismos, que sea como máximo uno y solo cuando suene natural al contexto."
+            "Habla en español formal de México. Usa 'tú' con corrección y respeto. " +
+            "Evita jerga, groserías y expresiones coloquiales exageradas."
         ));
         
         PROFILES.put("es_es", new LanguageProfile(
             "es_es", "Español (España)", "español de España",
-            "Habla en español natural de España. Puedes usar 'vosotros' y tutear. " +
-            "Sé casual sin forzar modismos."
+            "Habla en español formal de España con gramática peninsular correcta. " +
+            "Evita jerga callejera y groserías."
         ));
         
         PROFILES.put("es_ar", new LanguageProfile(
             "es_ar", "Español (Argentina)", "español argentino",
-            "Habla en español natural de Argentina. Usa voseo ('vos sos', 'vos tenés'). " +
-            "No uses 'tú'. Sé casual sin forzar modismos."
+            "Habla en español formal de Argentina. Usa voseo respetuoso ('vos') con corrección. " +
+            "Evita lunfardo, jerga y groserías."
         ));
         
         PROFILES.put("es_cl", new LanguageProfile(
@@ -51,7 +53,7 @@ public class LanguageManager {
         // Inglés - Variantes
         PROFILES.put("en_us", new LanguageProfile(
             "en_us", "English (US)", "American English",
-            "Speak in natural casual American English. Use American spellings. Be casual like chatting on Discord."
+            "Use formal, strategic American English. Keep a direct and professional tone."
         ));
         
         PROFILES.put("en_gb", new LanguageProfile(
@@ -149,8 +151,8 @@ public class LanguageManager {
             }
         }
         
-        // Default: español mexicano
-        return PROFILES.get("es_mx");
+        // Default: español formal internacional
+        return PROFILES.get("default");
     }
     
     public static LanguageProfile getProfileOrDefault(String languageCode, String defaultCode) {
@@ -160,7 +162,7 @@ public class LanguageManager {
         profile = PROFILES.get(defaultCode);
         if (profile != null) return profile;
         
-        return PROFILES.get("es_mx");
+        return PROFILES.get("default");
     }
     
     public record LanguageProfile(
@@ -169,6 +171,28 @@ public class LanguageManager {
         String languageName,
         String promptInstructions
     ) {
+        public String getDialectInstructions() {
+            return switch (code) {
+                case "es_mx" -> "Usa español formal de México con trato de 'tú'. Sé claro, estratégico y respetuoso. Prohibido usar jerga, groserías o caricaturizar la región.";
+                case "es_ar" -> "Usa español formal de Argentina con voseo educado ('vos'). Prohibido usar lunfardo, jerga o groserías.";
+                case "es_es" -> "Usa español formal de España con gramática peninsular correcta. Prohibido usar jerga callejera y groserías.";
+                case "en_us" -> "Use formal, strategic American English. Keep concise, precise wording and avoid slang or profanity.";
+                case "default" -> "Usa español neutro formal e internacional, con tono estratégico, claro y sin jergas.";
+                default -> promptInstructions;
+            };
+        }
+
+        public String getEmotiveExamples() {
+            return switch (code) {
+                case "es_mx" -> "1) Cuidado, tu salud es baja.\n2) Excelente hallazgo.\n3) Una situación lamentable.";
+                case "es_ar" -> "1) Tené cuidado, tu salud es baja.\n2) Excelente hallazgo.\n3) Una baja lamentable.";
+                case "es_es" -> "1) Ten cuidado, tu salud es baja.\n2) Excelente hallazgo.\n3) Una situación lamentable.";
+                case "en_us" -> "1) Watch out, your health is low.\n2) Excellent find.\n3) An unfortunate loss.";
+                case "default" -> "1) Cuidado, tu salud es baja.\n2) Excelente hallazgo.\n3) Una situación lamentable.";
+                default -> "1) Cuidado, tu salud es baja.\n2) Excelente hallazgo.\n3) Una situación lamentable.";
+            };
+        }
+
         // Frases localizadas para usar en prompts
         public String getGreetingPrompt() {
             return switch (code.split("_")[0]) {

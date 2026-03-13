@@ -1,5 +1,6 @@
 package com.adenium.zanatenunchi.ai;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
 import com.adenium.zanatenunchi.config.ModConfig;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -37,8 +38,17 @@ public class OllamaClient {
     }
 
     public String callOllama(String systemPrompt, String userMessage, JsonArray history) throws Exception {
+        return callOllama(systemPrompt, userMessage, history, null);
+    }
+
+    public String callOllama(String systemPrompt, String userMessage, JsonArray history, BotEvent.Impact impact) throws Exception {
         StringBuilder ctx = new StringBuilder();
         int maxHistory = config.getMaxHistoryMessages();
+        if (impact == BotEvent.Impact.HIGH) {
+            maxHistory = Math.min(maxHistory, 1);
+        } else if (impact == BotEvent.Impact.NORMAL) {
+            maxHistory = Math.min(maxHistory, 3);
+        }
         int start = Math.max(0, history.size() - maxHistory);
         for (int i = start; i < history.size(); i++) {
             JsonObject msg = history.get(i).getAsJsonObject();
@@ -59,10 +69,32 @@ public class OllamaClient {
         body.addProperty("prompt", fullPrompt);
         body.addProperty("stream", false);
 
+        JsonObject options = new JsonObject();
+        options.addProperty("temperature", impact == BotEvent.Impact.HIGH ? 0.15 : 0.25);
+        options.addProperty("top_p", 0.8);
+        options.addProperty("repeat_penalty", 1.15);
+        if (impact != null) {
+            options.addProperty("num_predict", switch (impact) {
+                case LOW -> 20;
+                case NORMAL -> 28;
+                case HIGH -> 20;
+            });
+        }
+        body.add("options", options);
+
+        int requestTimeoutSeconds = config.getOllamaTimeoutSeconds();
+        if (impact != null) {
+            requestTimeoutSeconds = Math.min(requestTimeoutSeconds, switch (impact) {
+                case LOW -> 8;
+                case NORMAL -> 10;
+                case HIGH -> 9;
+            });
+        }
+
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(config.getOllamaApiUrl()))
                 .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(config.getOllamaTimeoutSeconds()))
+                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                 .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(body)))
                 .build();
 

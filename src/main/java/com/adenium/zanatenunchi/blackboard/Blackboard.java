@@ -41,6 +41,7 @@ public class Blackboard {
     private final Set<String> awaitingName;
     private final Set<String> pendingGreeting;
     private final Set<String> pendingPersonality;
+    private final Set<UUID> highInProcessPlayers;
 
     private volatile long lastDayTime = -1;
     private volatile boolean wasRaining = false;
@@ -65,6 +66,7 @@ public class Blackboard {
         this.awaitingName = Collections.synchronizedSet(new HashSet<>());
         this.pendingGreeting = Collections.synchronizedSet(new HashSet<>());
         this.pendingPersonality = Collections.synchronizedSet(new HashSet<>());
+        this.highInProcessPlayers = Collections.synchronizedSet(new HashSet<>());
     }
 
     public static synchronized Blackboard getInstance() {
@@ -79,6 +81,14 @@ public class Blackboard {
             LOGGER.debug("Evento LOW duplicado ignorado: {} para jugador {}", event.prompt(), event.playerUuid());
             return;
         }
+
+        if (event.impact() != BotEvent.Impact.HIGH
+                && !isRegistrationEvent(event.prompt())
+                && hasHighPendingOrProcessing(event.playerUuid())) {
+            LOGGER.debug("Evento {} ignorado por HIGH pendiente/procesando para jugador {}", event.impact(), event.playerUuid());
+            return;
+        }
+
         cleanupOldEventsForPlayer(event.playerUuid(), event.impact());
         eventQueue.offer(event);
         LOGGER.info("Evento publicado: {} - {} para jugador {}", event.prompt(), event.impact(), event.playerUuid());
@@ -132,7 +142,9 @@ public class Blackboard {
 
         for (BotEvent event : allEvents) {
             if (event.playerUuid().equals(playerUuid)) {
-                if (newEventImpact == BotEvent.Impact.HIGH && event.impact() != BotEvent.Impact.HIGH) {
+                if (newEventImpact == BotEvent.Impact.HIGH
+                        && event.impact() != BotEvent.Impact.HIGH
+                        && !isRegistrationEvent(event.prompt())) {
                     continue;
                 }
                 playerEvents.add(event);
@@ -149,6 +161,31 @@ public class Blackboard {
         eventQueue.addAll(otherEvents);
         eventQueue.addAll(playerEvents);
     }
+
+    public void markHighProcessing(UUID playerUuid) {
+        highInProcessPlayers.add(playerUuid);
+    }
+
+    public void clearHighProcessing(UUID playerUuid) {
+        highInProcessPlayers.remove(playerUuid);
+    }
+
+    public boolean hasHighPendingOrProcessing(UUID playerUuid) {
+        if (highInProcessPlayers.contains(playerUuid)) {
+            return true;
+        }
+        for (BotEvent event : eventQueue) {
+            if (event.playerUuid().equals(playerUuid) && event.impact() == BotEvent.Impact.HIGH) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isRegistrationEvent(String prompt) {
+        return prompt.startsWith("GREETING_") || prompt.startsWith("CHAT_NAME_RECEIVED:");
+    }
+
 
     public void clearEventQueue() {
         eventQueue.clear();
@@ -521,6 +558,7 @@ public class Blackboard {
         awaitingName.clear();
         pendingGreeting.clear();
         pendingPersonality.clear();
+        highInProcessPlayers.clear();
         lastSpontaneousMs.clear();
         lastHighEventMs.clear();
         lastReactiveEventMs.clear();

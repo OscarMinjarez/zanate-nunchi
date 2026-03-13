@@ -151,6 +151,18 @@ public class PersonalityGenerator {
         CompletableFuture.runAsync(() -> generatePlayerPersonality(uuid, playerLanguage));
     }
 
+    /**
+     * Asigna una personalidad de respaldo de forma inmediata para no bloquear onboarding.
+     */
+    public void ensureImmediatePlayerPersonality(String uuid, String playerLanguage) {
+        if (blackboard.hasPlayerPersonality(uuid)) {
+            return;
+        }
+        LOGGER.info("Asignando personalidad inmediata de respaldo para jugador {}", uuid);
+        createFallbackPlayerPersonality(uuid, playerLanguage);
+        blackboard.removePendingPersonality(uuid);
+    }
+
     private void generatePlayerPersonality(String uuid, String playerLanguage) {
         // Si ya tiene personalidad, no generar nueva
         if (blackboard.hasPlayerPersonality(uuid)) {
@@ -160,11 +172,11 @@ public class PersonalityGenerator {
         }
 
         LOGGER.info("Generando personalidad única para jugador {}...", uuid);
-        
+
         try {
             // Usar el idioma del jugador para el prompt
             String languageHint = getLanguageHint(playerLanguage);
-            
+
             String prompt = """
                 Crea una personalidad ÚNICA para un compañero gamer de Minecraft.
                 
@@ -187,14 +199,19 @@ public class PersonalityGenerator {
                 """.formatted(languageHint);
 
             String personalityStr = ollamaClient.callOllamaForPersonality(prompt);
+            JsonObject p = tryParseAndValidate(personalityStr);
 
-            if (personalityStr != null && !personalityStr.isEmpty()) {
-                JsonObject p = JsonParser.parseString(personalityStr).getAsJsonObject();
-                if (validatePersonality(p)) {
-                    blackboard.setPlayerPersonality(uuid, p);
-                    dataManager.saveData();
-                    LOGGER.info("Personalidad por jugador creada: {} para UUID {}", 
-                            p.get("name").getAsString(), uuid);
+            if (p != null) {
+                blackboard.setPlayerPersonality(uuid, p);
+                dataManager.saveData();
+                LOGGER.info("Personalidad por jugador creada: {} para UUID {}",
+                        p.get("name").getAsString(), uuid);
+                blackboard.removePendingPersonality(uuid);
+                publishGreetingForPlayer(uuid);
+                return;
+            } else {
+                LOGGER.warn("Personalidad jug. no válida, reintentando con prompt simple...");
+                if (retryPlayerGeneration(uuid, playerLanguage)) {
                     blackboard.removePendingPersonality(uuid);
                     publishGreetingForPlayer(uuid);
                     return;
@@ -264,16 +281,17 @@ public class PersonalityGenerator {
             default -> new String[]{"Alex", "Sam", "Charlie", "Jordan", "Taylor", "Morgan", "Casey", "Riley"};
         };
     }
-
     private void publishGreetingForPlayer(String uuid) {
         if (blackboard.getCurrentServer() == null) return;
-        
+        if (blackboard.isAwaitingName(uuid)) return;
+        String knownName = blackboard.getPlayerName(uuid);
+        if (knownName != null && !knownName.isBlank()) return;
+
         try {
             ServerPlayer player = blackboard.getCurrentServer().getPlayerList().getPlayer(UUID.fromString(uuid));
             if (player != null && player.connection != null) {
                 // Verificar si ya conocemos al jugador
                 boolean isNewPlayer = !blackboard.hasPlayer(uuid);
-                
                 BotEvent event = new BotEvent(
                         player.getUUID(),
                         isNewPlayer ? "GREETING_NEW_PLAYER" : "GREETING_RETURNING_PLAYER",
@@ -282,7 +300,7 @@ public class PersonalityGenerator {
                         true
                 );
                 blackboard.publishEvent(event);
-                LOGGER.info("Saludo publicado para jugador: {} (nuevo: {})", 
+                LOGGER.info("Saludo publicado para jugador: {} (nuevo: {})",
                         player.getName().getString(), isNewPlayer);
             }
         } catch (Exception e) {
@@ -290,9 +308,9 @@ public class PersonalityGenerator {
         }
     }
 
+
     private String getLanguageHint(String languageCode) {
         if (languageCode == null) return "Preferiblemente nombre latino o anglosajón";
-        
         String base = languageCode.split("_")[0];
         return switch (base) {
             case "es" -> "Preferiblemente nombre hispano (María, Carlos, Sofía, Diego)";
@@ -312,7 +330,6 @@ public class PersonalityGenerator {
 
     private void generatePersonality(long worldSeed) {
         LOGGER.info("Generando personalidad única del bot para este mundo...");
-        
         try {
             String prompt = """
                 Crea una personalidad ÚNICA para un compañero gamer de Minecraft.
@@ -336,31 +353,26 @@ public class PersonalityGenerator {
                 Responde SOLO con este JSON:
                 {"name": "NombreReal", "gender": "male o female", "age": "número", "traits": "3 rasgos", "speakingStyle": "estilo breve"}
                 """;
-
             String personalityStr = ollamaClient.callOllamaForPersonality(prompt);
-
-            if (personalityStr != null && !personalityStr.isEmpty()) {
-                JsonObject p = JsonParser.parseString(personalityStr).getAsJsonObject();
-                if (validatePersonality(p)) {
-                    blackboard.setPersonality(p);
-                    dataManager.saveData();
-                    LOGGER.info("Personalidad creada por IA: {} ({}, {} años)",
-                            p.get("name").getAsString(), p.get("gender").getAsString(), p.get("age").getAsString());
+            JsonObject p = tryParseAndValidate(personalityStr);
+            if (p != null) {
+                blackboard.setPersonality(p);
+                dataManager.saveData();
+                LOGGER.info("Personalidad creada por IA: {} ({}, {} años)",
+                        p.get("name").getAsString(), p.get("gender").getAsString(), p.get("age").getAsString());
+                greetPendingPlayers();
+                return;
+            } else {
+                LOGGER.warn("Personalidad no válida, reintentando...");
+                // Segundo intento con prompt más estricto
+                if (retryGeneration()) {
                     greetPendingPlayers();
                     return;
-                } else {
-                    LOGGER.warn("Personalidad no válida, reintentando...");
-                    // Segundo intento con prompt más estricto
-                    if (retryGeneration()) {
-                        greetPendingPlayers();
-                        return;
-                    }
                 }
             }
         } catch (Exception e) {
             LOGGER.error("Error generando personalidad: {}", e.getMessage());
         }
-
         createFallbackPersonality(worldSeed);
         greetPendingPlayers();
     }
@@ -372,16 +384,13 @@ public class PersonalityGenerator {
                 NO nombres de fantasía. Solo JSON:
                 {"name": "NombreSimple", "gender": "female", "age": "22", "traits": "amigable, curiosa, algo impaciente", "speakingStyle": "casual y directa"}
                 """;
-            
             String result = ollamaClient.callOllamaForPersonality(strictPrompt);
-            if (result != null && !result.isEmpty()) {
-                JsonObject p = JsonParser.parseString(result).getAsJsonObject();
-                if (p.has("name") && p.has("gender")) {
-                    blackboard.setPersonality(p);
-                    dataManager.saveData();
-                    LOGGER.info("Personalidad (reintento): {}", p.get("name").getAsString());
-                    return true;
-                }
+            JsonObject p = tryParseAndValidate(result);
+            if (p != null) {
+                blackboard.setPersonality(p);
+                dataManager.saveData();
+                LOGGER.info("Personalidad (reintento): {}", p.get("name").getAsString());
+                return true;
             }
         } catch (Exception e) {
             LOGGER.error("Reintento fallido: {}", e.getMessage());
@@ -389,13 +398,60 @@ public class PersonalityGenerator {
         return false;
     }
 
+    private boolean retryPlayerGeneration(String uuid, String playerLanguage) {
+        try {
+            String hint = getLanguageHint(playerLanguage);
+            // Prompt más estricto y simple para reintento
+            String strictPrompt = """
+                Genera UN nombre de persona real y personalidad para videojuego.
+                %s
+                NO nombres de fantasía. Solo JSON:
+                {"name": "NombreSimple", "gender": "female", "age": "22", "traits": "amigable, curiosa", "speakingStyle": "casual"}
+                """.formatted(hint);
+                
+            String result = ollamaClient.callOllamaForPersonality(strictPrompt);
+            JsonObject p = tryParseAndValidate(result);
+            if (p != null) {
+                blackboard.setPlayerPersonality(uuid, p);
+                dataManager.saveData();
+                LOGGER.info("Personalidad jug. (reintento): {}", p.get("name").getAsString());
+                return true;
+            }
+        } catch (Exception e) {
+            LOGGER.error("Reintento jugador fallido: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    private JsonObject tryParseAndValidate(String jsonStr) {
+        if (jsonStr == null || jsonStr.isEmpty()) return null;
+        try {
+            // Limpieza básica de markdown si el modelo decide ignorar format:json puro
+            String clean = jsonStr.trim();
+            if (clean.startsWith("```json")) {
+                clean = clean.substring(7);
+            } else if (clean.startsWith("```")) {
+                clean = clean.substring(3);
+            }
+            if (clean.endsWith("```")) {
+                clean = clean.substring(0, clean.length() - 3);
+            }
+            
+            JsonObject p = JsonParser.parseString(clean).getAsJsonObject();
+            if (validatePersonality(p)) {
+                return p;
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Error parseando JSON de personalidad: {}", e.getMessage());
+        }
+        return null;
+    }
+
     private boolean validatePersonality(JsonObject p) {
         if (!p.has("name") || !p.has("gender") || !p.has("age") || !p.has("traits") || !p.has("speakingStyle")) {
             return false;
         }
-        
         String name = p.get("name").getAsString().toLowerCase();
-        
         // Rechazar nombres obviamente fantásticos
         String[] invalidPatterns = {
             "zor", "xan", "kaid", "zeph", "aeth", "vex", "rax", "thor", "loki",
@@ -403,23 +459,19 @@ public class PersonalityGenerator {
             "storm", "fire", "ice", "crystal", "moon", "star", "void", "chaos",
             "seraph", "demon", "angel", "phoenix", "griffin", "titan"
         };
-        
         for (String pattern : invalidPatterns) {
             if (name.contains(pattern)) {
                 LOGGER.warn("Nombre rechazado (patrón '{}'): {}", pattern, name);
                 return false;
             }
         }
-        
         // Rechazar nombres muy largos o raros
         if (name.length() > 15 || name.contains("'") || name.contains("-") && name.length() > 10) {
             LOGGER.warn("Nombre rechazado (formato): {}", name);
             return false;
         }
-
         // Normalizar campos que Ollama puede devolver como array en vez de string
         normalizePersonalityFields(p);
-        
         return true;
     }
 
@@ -460,14 +512,11 @@ public class PersonalityGenerator {
 
     private void createFallbackPersonality(long worldSeed) {
         Random random = new Random(worldSeed);
-        
         // Nombres universales/unisex simples que existen en muchas culturas
         // Solo se usa si Ollama falla completamente
         String[] universalNames = {"Alex", "Sam", "Charlie", "Jordan", "Taylor", "Morgan", "Casey", "Riley"};
-        
         boolean isFemale = random.nextBoolean();
         String name = universalNames[random.nextInt(universalNames.length)];
-        
         // Combinar múltiples traits para variedad
         String trait1 = PERSONALITY_TRAITS[random.nextInt(PERSONALITY_TRAITS.length)];
         String trait2 = PERSONALITY_TRAITS[random.nextInt(PERSONALITY_TRAITS.length)];
@@ -475,22 +524,18 @@ public class PersonalityGenerator {
         while (trait2.equals(trait1)) {
             trait2 = PERSONALITY_TRAITS[random.nextInt(PERSONALITY_TRAITS.length)];
         }
-        
         String style1 = SPEAKING_STYLES[random.nextInt(SPEAKING_STYLES.length)];
         String style2 = SPEAKING_STYLES[random.nextInt(SPEAKING_STYLES.length)];
         while (style2.equals(style1)) {
             style2 = SPEAKING_STYLES[random.nextInt(SPEAKING_STYLES.length)];
         }
-        
         int age = 18 + random.nextInt(11);
-        
         JsonObject fallback = new JsonObject();
         fallback.addProperty("name", name);
         fallback.addProperty("gender", isFemale ? "female" : "male");
         fallback.addProperty("age", String.valueOf(age));
         fallback.addProperty("traits", trait1);
         fallback.addProperty("speakingStyle", style1 + ", " + style2);
-        
         blackboard.setPersonality(fallback);
         dataManager.saveData();
         LOGGER.info("Personalidad de respaldo: {} ({}, {} años)", name, isFemale ? "female" : "male", age);
@@ -499,9 +544,7 @@ public class PersonalityGenerator {
     private void greetPendingPlayers() {
         Set<String> pending = blackboard.getPendingGreetings();
         if (pending.isEmpty() || blackboard.getCurrentServer() == null) return;
-
         blackboard.clearPendingGreetings();
-
         for (String uuid : pending) {
             try {
                 ServerPlayer player = blackboard.getCurrentServer().getPlayerList().getPlayer(UUID.fromString(uuid));

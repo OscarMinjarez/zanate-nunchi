@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.Normalizer;
+import java.net.http.HttpTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,9 +43,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class BotController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("BotController");
-    private static final int PROCESS_INTERVAL_TICKS = 20;
-    private static final long NORMAL_REACTIVE_COOLDOWN_MS = 15_000L;
-    private static final long LOW_REACTIVE_COOLDOWN_MS = 45_000L;
+    private static final int PROCESS_INTERVAL_TICKS = 5;
+    private static final long NORMAL_REACTIVE_COOLDOWN_MS = 6_000L;
+    private static final long LOW_REACTIVE_COOLDOWN_MS = 12_000L;
     private static final Set<String> EVENT_FACT_TERMS = new HashSet<>(Arrays.asList(
             "creeper", "zombi", "zombie", "esqueleto", "skeleton", "araña", "arana", "spider",
             "warden", "wither", "dragon", "dragón", "ender dragon", "guardian", "elder guardian",
@@ -55,6 +56,9 @@ public class BotController {
     ));
     private static final List<String> SPECULATION_MARKERS = Arrays.asList(
             "o algo", "me parece que", "parece que", "seguro que", "quizá", "quizas", "tal vez", "a lo mejor"
+    );
+    private static final List<String> ASSISTANT_TONE_MARKERS = Arrays.asList(
+            "como ia", "como asistente", "en que puedo ayudarte", "servicio al cliente", "estoy aqui para ayudarte"
     );
 
     private final Blackboard blackboard;
@@ -160,39 +164,65 @@ public class BotController {
         }
 
         String prompt = event.prompt();
-
-        // Eventos del flujo de registro no requieren personalidad
-        boolean isRegistrationFlow = prompt.startsWith("GREETING_") || prompt.startsWith("CHAT_NAME_RECEIVED:");
-        if (!isRegistrationFlow && !blackboard.hasPlayerPersonality(uuid)) {
-            LOGGER.info("Evento ignorado para {}: sin personalidad asignada", uuid);
+        boolean highEvent = event.impact() == BotEvent.Impact.HIGH;
+        if (!highEvent && !prompt.startsWith("GREETING_") && !prompt.startsWith("CHAT_NAME_RECEIVED:")
+                && blackboard.hasHighPendingOrProcessing(event.playerUuid())) {
+            LOGGER.debug("Evento {} descartado para {} porque hay HIGH pendiente/procesando", event.impact(), uuid);
             return;
         }
 
-        if (!validateCooldowns(uuid, event)) {
+        // Eventos del flujo de registro no requieren personalidad
+        boolean isRegistrationFlow = prompt.startsWith("GREETING_") || prompt.startsWith("CHAT_NAME_RECEIVED:");
+        if (!isRegistrationFlow && blackboard.getPersonalityForPlayer(uuid) == null) {
+            LOGGER.info("Evento diferido para {}: sin personalidad disponible aún", uuid);
+            blackboard.publishEvent(new BotEvent(
+                    event.playerUuid(),
+                    event.prompt(),
+                    event.impact(),
+                    System.currentTimeMillis(),
+                    event.neverIgnore()
+            ));
+            return;
+        }
+
+        if (!validateCooldowns(uuid, event, isRegistrationFlow)) {
             LOGGER.debug("Evento ignorado por cooldown: {}", prompt);
             return;
         }
 
         LOGGER.info("Ejecutando handler para: {}", prompt);
 
-        if (prompt.startsWith("GREETING_NEW_PLAYER")) {
-            handleNewPlayerGreeting(player, uuid);
-        } else if (prompt.startsWith("GREETING_RETURNING_PLAYER")) {
-            handleReturningPlayerGreeting(player, uuid);
-        } else if (prompt.startsWith("CHAT_NAME_RECEIVED:")) {
-            String playerName = prompt.substring("CHAT_NAME_RECEIVED:".length());
-            handleNameReceived(player, uuid, playerName);
-        } else if (prompt.startsWith("CHAT_MESSAGE:")) {
-            String message = prompt.substring("CHAT_MESSAGE:".length());
-            handleChatMessage(player, uuid, message);
-        } else {
-            handleGenericEvent(player, uuid, event);
+        if (highEvent) {
+            blackboard.markHighProcessing(event.playerUuid());
+        }
+        try {
+            if (prompt.startsWith("GREETING_NEW_PLAYER")) {
+                handleNewPlayerGreeting(player, uuid);
+            } else if (prompt.startsWith("GREETING_RETURNING_PLAYER")) {
+                handleReturningPlayerGreeting(player, uuid);
+            } else if (prompt.startsWith("CHAT_NAME_RECEIVED:")) {
+                String playerName = prompt.substring("CHAT_NAME_RECEIVED:".length());
+                handleNameReceived(player, uuid, playerName);
+            } else if (prompt.startsWith("CHAT_MESSAGE:")) {
+                String message = prompt.substring("CHAT_MESSAGE:".length());
+                handleChatMessage(player, uuid, message);
+            } else {
+                handleGenericEvent(player, uuid, event);
+            }
+        } finally {
+            if (highEvent) {
+                blackboard.clearHighProcessing(event.playerUuid());
+            }
         }
     }
 
-    private boolean validateCooldowns(String uuid, BotEvent event) {
+    private boolean validateCooldowns(String uuid, BotEvent event, boolean isRegistrationFlow) {
         long now = System.currentTimeMillis();
         String prompt = event.prompt();
+
+        if (isRegistrationFlow) {
+            return true;
+        }
 
         if (event.neverIgnore()) {
             long lastHigh = blackboard.getLastHighEventMs(uuid);
@@ -207,12 +237,13 @@ public class BotController {
 
         if (isSpontaneousEvent(prompt)) {
             long lastSpont = blackboard.getLastSpontaneousMs(uuid);
-            if ((now - lastSpont) < config.getSpontaneousCooldownMs()) {
+            long spontaneousCooldown = Math.min(config.getSpontaneousCooldownMs(), 12_000L);
+            if ((now - lastSpont) < spontaneousCooldown) {
                 return false;
             }
             int silenceChance = switch (event.impact()) {
-                case LOW -> 65;
-                case NORMAL -> 45;
+                case LOW -> 0;
+                case NORMAL -> 0;
                 case HIGH -> 0;
             };
             if (ThreadLocalRandom.current().nextInt(100) < silenceChance) {
@@ -232,8 +263,8 @@ public class BotController {
         }
 
         int silenceChance = switch (event.impact()) {
-            case LOW -> 35;
-            case NORMAL -> 15;
+            case LOW -> 0;
+            case NORMAL -> 0;
             case HIGH -> 0;
         };
 
@@ -271,16 +302,12 @@ public class BotController {
 
     private void handleNewPlayerGreeting(ServerPlayer player, String uuid) {
         JsonObject personality = blackboard.getPersonalityForPlayer(uuid);
-        if (personality == null) return;
-
-        String botName = personality.get("name").getAsString();
+        String botName = getBotNameForReply(personality);
         String language = blackboard.getPlayerLanguage(uuid);
-        LanguageProfile langProfile = LanguageManager.getProfile(language);
-        String systemPrompt = promptManager.buildEmotivePrompt(personality, language);
-        String userPrompt = langProfile.getGreetingPrompt();
+        String reply = buildDeterministicAskName(language);
 
         try {
-            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, new JsonArray());
+            reply = applyPostGuardrails(reply, BotEvent.Impact.HIGH, null);
             sendMessage(player, botName, reply);
             blackboard.addAwaitingName(uuid);
             LOGGER.info("[Nuevo] {}: {}", botName, reply);
@@ -306,7 +333,8 @@ public class BotController {
         String userPrompt = langProfile.getReturningPlayerPrompt(playerName);
         JsonArray history = blackboard.getPlayerHistory(uuid);
         try {
-            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history);
+            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history, BotEvent.Impact.NORMAL);
+            reply = applyPostGuardrails(reply, BotEvent.Impact.NORMAL, playerName);
             blackboard.addPlayerHistory(uuid, "assistant", reply, ollamaClient.getMaxHistory());
             dataManager.saveData();
             sendMessage(player, botName, reply);
@@ -318,16 +346,12 @@ public class BotController {
 
     private void handleNameReceived(ServerPlayer player, String uuid, String playerName) {
         JsonObject personality = blackboard.getPersonalityForPlayer(uuid);
-        if (personality == null) return;
-
-        String botName = personality.get("name").getAsString();
+        String botName = getBotNameForReply(personality);
         String language = blackboard.getPlayerLanguage(uuid);
-        LanguageProfile langProfile = LanguageManager.getProfile(language);
-        String systemPrompt = promptManager.buildEmotivePrompt(personality, language);
-        String userPrompt = langProfile.getNameReceivedPrompt(playerName);
+        String reply = buildDeterministicNameAck(language, playerName);
 
         try {
-            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, new JsonArray());
+            reply = applyPostGuardrails(reply, BotEvent.Impact.HIGH, playerName);
             blackboard.addPlayerHistory(uuid, "assistant", reply, ollamaClient.getMaxHistory());
             sendMessage(player, botName, reply);
             LOGGER.info("[{}] {}: {}", playerName, botName, reply);
@@ -356,12 +380,22 @@ public class BotController {
         try {
             String userPrompt = "MENSAJE LITERAL DEL JUGADOR: \"" + message + "\". " +
                     "Responde a ese mensaje. Usa el contexto solo como apoyo. No asumas metas, planes ni intenciones que el jugador no dijo.";
-            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history);
+            // Chat del jugador se trata como alta prioridad para bajar latencia percibida.
+            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history, BotEvent.Impact.HIGH);
+            reply = applyPostGuardrails(reply, BotEvent.Impact.HIGH, playerName);
             blackboard.addPlayerHistory(uuid, "assistant", reply, ollamaClient.getMaxHistory());
             dataManager.saveData();
             sendMessage(player, botName, reply);
             LOGGER.info("[{}] {}: {}", playerName, botName, reply);
         } catch (Exception e) {
+            String fallback = buildTimeoutReply(BotEvent.Impact.HIGH, playerName, true);
+            blackboard.addPlayerHistory(uuid, "assistant", fallback, ollamaClient.getMaxHistory());
+            dataManager.saveData();
+            sendMessage(player, botName, fallback);
+            if (isTimeoutError(e)) {
+                LOGGER.warn("Timeout procesando mensaje de chat para {}. Enviado fallback.", uuid);
+                return;
+            }
             LOGGER.error("Error procesando mensaje de chat: {}", e.getMessage());
         }
     }
@@ -379,20 +413,45 @@ public class BotController {
         JsonArray history = getHistoryForEvent(uuid, event);
         LOGGER.debug("Prompt con nombre reemplazado: {}", prompt);
         try {
+            if (event.impact() == BotEvent.Impact.HIGH && isUrgentHighEvent(prompt)) {
+                String immediateReply = buildImmediateHighReply(playerName, prompt);
+                blackboard.addPlayerHistory(uuid, "assistant", immediateReply, ollamaClient.getMaxHistory());
+                dataManager.saveData();
+                sendMessage(player, botName, immediateReply);
+                LOGGER.info("[{}] {}: {}", playerName, botName, immediateReply);
+                return;
+            }
+
             long delay = switch (event.impact()) {
-                case LOW -> ThreadLocalRandom.current().nextLong(1000, 2000);
-                case NORMAL -> ThreadLocalRandom.current().nextLong(500, 1500);
+                case LOW -> ThreadLocalRandom.current().nextLong(50, 180);
+                case NORMAL -> ThreadLocalRandom.current().nextLong(80, 220);
                 case HIGH -> 0L;
             };
             if (delay > 0) {
                 Thread.sleep(delay);
             }
-            String reply = generateStrictEventReply(systemPrompt, prompt, history);
+            if (event.impact() != BotEvent.Impact.HIGH && blackboard.hasHighPendingOrProcessing(event.playerUuid())) {
+                LOGGER.debug("Se descarta respuesta {} por llegada de HIGH para {}", event.impact(), uuid);
+                return;
+            }
+            String reply = generateStrictEventReply(systemPrompt, prompt, history, event.impact(), playerName);
+            if (event.impact() != BotEvent.Impact.HIGH && blackboard.hasHighPendingOrProcessing(event.playerUuid())) {
+                LOGGER.debug("Se descarta envío {} por HIGH pendiente para {}", event.impact(), uuid);
+                return;
+            }
             blackboard.addPlayerHistory(uuid, "assistant", reply, ollamaClient.getMaxHistory());
             dataManager.saveData();
             sendMessage(player, botName, reply);
             LOGGER.info("[{}] {}: {}", playerName, botName, reply);
         } catch (Exception e) {
+            String fallback = buildTimeoutReply(event.impact(), playerName, false);
+            blackboard.addPlayerHistory(uuid, "assistant", fallback, ollamaClient.getMaxHistory());
+            dataManager.saveData();
+            sendMessage(player, botName, fallback);
+            if (isTimeoutError(e)) {
+                LOGGER.warn("Timeout en reacción de evento {} para {}. Enviado fallback.", event.impact(), uuid);
+                return;
+            }
             LOGGER.error("Error en reacción a evento: {}", e.getMessage());
         }
     }
@@ -518,21 +577,166 @@ public class BotController {
                 + "\n- Reacciona a lo observado, no escribas fanfic.";
     }
 
-    private String generateStrictEventReply(String systemPrompt, String eventPrompt, JsonArray history) throws Exception {
+    private String generateStrictEventReply(String systemPrompt, String eventPrompt, JsonArray history, BotEvent.Impact impact, String playerName) throws Exception {
         String userPrompt = buildStrictEventUserPrompt(eventPrompt);
-        String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history);
+        String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history, impact);
 
-        if (isContradictoryEventReply(eventPrompt, reply)) {
+        boolean shouldRetry = impact != BotEvent.Impact.HIGH;
+        if (shouldRetry && isContradictoryEventReply(eventPrompt, reply)) {
             LOGGER.warn("Respuesta contradictoria detectada. Reintentando con guardrail fuerte. Evento='{}' Reply='{}'", eventPrompt, reply);
             String retrySystemPrompt = systemPrompt
                     + "\n\nCORRECCIÓN OBLIGATORIA: Tu respuesta anterior contradijo el hecho actual."
                     + "\nDebes corregirte. No menciones ninguna causa, mob, arma, distancia o situación que no esté en el hecho actual o en el contexto explícito.";
             String retryUserPrompt = userPrompt
                     + "\n\nREINTENTO ÚNICO: Responde de nuevo en 1 oración, totalmente fiel al hecho actual.";
-            reply = ollamaClient.callOllama(retrySystemPrompt, retryUserPrompt, new JsonArray());
+            reply = ollamaClient.callOllama(retrySystemPrompt, retryUserPrompt, new JsonArray(), impact);
         }
 
-        return reply;
+        return applyPostGuardrails(reply, impact, playerName);
+    }
+
+    private String applyPostGuardrails(String rawReply, BotEvent.Impact impact, String playerName) {
+        if (rawReply == null || rawReply.isBlank()) {
+            return buildFallbackReply(impact, playerName);
+        }
+
+        String cleaned = rawReply.replaceAll("\\*[^*]*\\*", "").replaceAll("\\s+", " ").trim();
+        if (cleaned.isEmpty()) {
+            return buildFallbackReply(impact, playerName);
+        }
+
+        String normalized = ensureFinalPunctuation(cleaned);
+
+        String normalizedForChecks = normalizeForComparison(normalized);
+        if (containsSpeculationMarker(normalizedForChecks) || containsAssistantTone(normalizedForChecks)) {
+            return buildFallbackReply(impact, playerName);
+        }
+
+        if (playerName != null && !playerName.isBlank() && !normalized.toLowerCase(Locale.ROOT).contains(playerName.toLowerCase(Locale.ROOT))) {
+            normalized = playerName + ", " + normalized;
+            normalized = ensureFinalPunctuation(normalized);
+        }
+
+        if (isLikelyTruncated(normalized)) {
+            return buildFallbackReply(impact, playerName);
+        }
+
+        return normalized;
+    }
+
+    private boolean containsAssistantTone(String normalizedReply) {
+        for (String marker : ASSISTANT_TONE_MARKERS) {
+            if (normalizedReply.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isLikelyTruncated(String text) {
+        String normalized = text.trim().toLowerCase(Locale.ROOT);
+        return normalized.matches(".*\\b(de|del|a|con|en|por|para|que|y|o|el|la|los|las|un|una)\\.$");
+    }
+
+    private String ensureFinalPunctuation(String text) {
+        if (text.isEmpty()) return text;
+        char last = text.charAt(text.length() - 1);
+        if (last == '.' || last == '!' || last == '?') {
+            return text;
+        }
+        return text + ".";
+    }
+
+    private String buildFallbackReply(BotEvent.Impact impact, String playerName) {
+        String prefix = (playerName != null && !playerName.isBlank()) ? playerName + ", " : "";
+        if (impact == null) {
+            return prefix + "mantente alerta.";
+        }
+        return switch (impact) {
+            case LOW -> prefix + "sigue con cuidado.";
+            case NORMAL -> prefix + "mantente alerta y actua con cuidado.";
+            case HIGH -> prefix + "peligro inmediato, reacciona ahora.";
+        };
+    }
+
+    private boolean isUrgentHighEvent(String prompt) {
+        String lower = prompt.toLowerCase(Locale.ROOT);
+        return lower.contains("muerte verificada")
+                || lower.contains("murió")
+                || lower.contains("mato")
+                || lower.contains("mató")
+                || lower.contains("casi muerto")
+                || lower.contains("se está muriendo de hambre")
+                || lower.contains("peligro")
+                || lower.contains("alerta verificada");
+    }
+
+    private String buildImmediateHighReply(String playerName, String prompt) {
+        String prefix = (playerName != null && !playerName.isBlank()) ? playerName + ", " : "";
+        String lower = prompt.toLowerCase(Locale.ROOT);
+        if (lower.contains("muerte verificada") || lower.contains("murió") || lower.contains("mato") || lower.contains("mató")) {
+            return prefix + "baja confirmada, reagrupa y evita otra exposición.";
+        }
+        if (lower.contains("casi muerto") || lower.contains("corazones")) {
+            return prefix + "salud critica, prioriza curarte ahora mismo.";
+        }
+        if (lower.contains("se está muriendo de hambre") || lower.contains("hambre")) {
+            return prefix + "hambre critica, come de inmediato y busca cobertura.";
+        }
+        if (lower.contains("alerta verificada") || lower.contains("hay ")) {
+            return prefix + "amenaza cercana detectada, mantente en movimiento y cubrete.";
+        }
+        return buildFallbackReply(BotEvent.Impact.HIGH, playerName);
+    }
+
+    private String buildTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+        String prefix = (playerName != null && !playerName.isBlank()) ? playerName + ", " : "";
+        if (fromChat) {
+            return prefix + "te leo; dame un instante y mantente alerta.";
+        }
+        if (impact == null) {
+            return prefix + "mantente alerta.";
+        }
+        return switch (impact) {
+            case LOW -> prefix + "recibido, sigo observando.";
+            case NORMAL -> prefix + "mantente alerta, estoy procesando la situación.";
+            case HIGH -> prefix + "peligro inmediato, ponte a salvo ahora.";
+        };
+    }
+
+    private boolean isTimeoutError(Exception e) {
+        if (e instanceof HttpTimeoutException) {
+            return true;
+        }
+        String msg = e.getMessage();
+        return msg != null && msg.toLowerCase(Locale.ROOT).contains("timed out");
+    }
+
+    private String getBotNameForReply(JsonObject personality) {
+        if (personality != null && personality.has("name")) {
+            return personality.get("name").getAsString();
+        }
+        String fallback = blackboard.getBotName();
+        return (fallback == null || fallback.isBlank()) ? "Bot" : fallback;
+    }
+
+    private String buildDeterministicAskName(String language) {
+        String base = language == null ? "es" : language.split("_")[0];
+        return switch (base) {
+            case "en" -> "Hi, what should I call you?";
+            case "pt" -> "Oi, como devo te chamar?";
+            default -> "Hola, ¿cómo te llamas?";
+        };
+    }
+
+    private String buildDeterministicNameAck(String language, String playerName) {
+        String base = language == null ? "es" : language.split("_")[0];
+        String safeName = (playerName == null || playerName.isBlank()) ? "jugador" : playerName;
+        return switch (base) {
+            case "en" -> "Nice to meet you, " + safeName + ".";
+            case "pt" -> "Prazer, " + safeName + ".";
+            default -> "Un gusto, " + safeName + ".";
+        };
     }
 
     private String buildStrictEventUserPrompt(String eventPrompt) {

@@ -42,7 +42,7 @@ public class ChatObserver {
 
             CompletableFuture.runAsync(() -> {
                 try {
-                    Thread.sleep(1500);
+                    Thread.sleep(300);
                 } catch (InterruptedException ignored) {
                 }
 
@@ -56,14 +56,13 @@ public class ChatObserver {
                     // Marcar como pendiente de personalidad
                     blackboard.addPendingPersonality(uuid);
 
-                    // Generar personalidad para este jugador
+                    // Bootstrap inmediato para que el onboarding no use un bot genérico.
                     if (personalityGenerator != null) {
-                        personalityGenerator.generatePlayerPersonalityAsync(uuid, language);
+                        personalityGenerator.ensureImmediatePlayerPersonality(uuid, language);
                     }
-                    return;
                 }
 
-                // Ya tiene personalidad, proceder con saludo
+                // Proceder con saludo sin bloquear por personalidad.
                 if (!blackboard.hasPlayer(uuid)) {
                     BotEvent event = new BotEvent(
                             player.getUUID(),
@@ -92,6 +91,24 @@ public class ChatObserver {
             String uuid = sender.getUUID().toString();
             String content = message.signedContent().trim();
 
+            // Si estamos esperando nombre, procesarlo SIEMPRE aunque la personalidad siga pendiente.
+            if (blackboard.isAwaitingName(uuid)) {
+                blackboard.removeAwaitingName(uuid);
+                String parsedName = NameParser.extractName(content);
+                blackboard.registerNewPlayer(uuid, parsedName);
+                LOGGER.info("Nombre extraído: '{}' del mensaje: '{}'", parsedName, content);
+
+                BotEvent event = new BotEvent(
+                        sender.getUUID(),
+                        "CHAT_NAME_RECEIVED:" + parsedName,
+                        Impact.HIGH,
+                        System.currentTimeMillis(),
+                        true
+                );
+                blackboard.publishEvent(event);
+                return;
+            }
+
             // Esperar a que tenga personalidad antes de procesar mensajes
             if (!blackboard.hasPlayerPersonality(uuid)) {
                 // Si está pendiente de personalidad, ignorar por ahora
@@ -107,21 +124,7 @@ public class ChatObserver {
                 return;
             }
 
-            if (blackboard.isAwaitingName(uuid)) {
-                blackboard.removeAwaitingName(uuid);
-                String parsedName = NameParser.extractName(content);
-                blackboard.registerNewPlayer(uuid, parsedName);
-                LOGGER.info("Nombre extraído: '{}' del mensaje: '{}'", parsedName, content);
-
-                BotEvent event = new BotEvent(
-                        sender.getUUID(),
-                        "CHAT_NAME_RECEIVED:" + parsedName,
-                        Impact.HIGH,
-                        System.currentTimeMillis(),
-                        true
-                );
-                blackboard.publishEvent(event);
-            } else if (!blackboard.hasPlayer(uuid)) {
+            if (!blackboard.hasPlayer(uuid)) {
                 BotEvent event = new BotEvent(
                         sender.getUUID(),
                         "GREETING_NEW_PLAYER",
