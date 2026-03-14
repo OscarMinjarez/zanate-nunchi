@@ -163,8 +163,7 @@ public class LanguageManager {
     ) {
         public String getDialectInstructions() {
             return switch (code) {
-                case "es_mx" -> "Habla COMO UN AMIGO MEXICANO EN DISCORD: natural, directo, con confianza. Usa 'tú'. Puedes usar 'güey', 'órale' con moderación. NUNCA uses 'tío', 'vale' o expresiones españolas. Prioriza EMOCIÓN sobre precisión. Prohibido groserías.";
-                case "es_ar" -> "Habla COMO UN AMIGO ARGENTINO EN DISCORD: natural, con voseo casual ('vos'). Sé cálido y expresivo. Evita lunfardo forzado. Prioriza emoción. Prohibido groserías.";
+                case "es_mx" -> "Habla COMO UN AMIGO MEXICANO EN DISCORD: ... NUNCA, bajo ninguna circunstancia, uses 'tío', 'vale', 'guay' o expresiones españolas. Si el modelo las genera, ignóralas y usa 'güey', 'wey', 'órale' en su lugar. ...";                case "es_ar" -> "Habla COMO UN AMIGO ARGENTINO EN DISCORD: natural, con voseo casual ('vos'). Sé cálido y expresivo. Evita lunfardo forzado. Prioriza emoción. Prohibido groserías.";
                 case "es_es" -> "Habla COMO UN AMIGO ESPAÑOL EN DISCORD: natural, tono relajado. Usa 'tú'. NUNCA uses 'wey', 'órale' o modismos latinos. Prioriza emoción. Prohibido groserías.";
                 case "es_cl" -> "Habla COMO UN AMIGO CHILENO EN DISCORD: natural, tutea. Sé casual sin forzar modismos. Prioriza emoción. Prohibido groserías.";
                 case "es_co" -> "Habla COMO UN AMIGO COLOMBIANO EN DISCORD: natural, tutea. Sé cercano. Prioriza emoción. Prohibido groserías.";
