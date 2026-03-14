@@ -5,8 +5,11 @@ import com.adenium.zanatenunchi.blackboard.BotEvent;
 import com.adenium.zanatenunchi.blackboard.BotEvent.Impact;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,11 +70,11 @@ public class WorldObserver {
 
         if (lastDayTime >= 0) {
             if (lastDayTime < 12500 && dayTime >= 12500 && dayTime < 13500) {
-                publishWorldEvent(server, "Acaba de anochecer en el servidor. Comenta algo breve sobre la noche.", 40, Impact.LOW, false);
+                publishSunTransitionEvent(server, false);
             }
 
             if (lastDayTime >= 22500 && dayTime < 1000) {
-                publishWorldEvent(server, "Acaba de amanecer. Di algo corto.", 35, Impact.LOW, false);
+                publishSunTransitionEvent(server, true);
             }
 
             if (!wasRaining && isRaining && !isThundering) {
@@ -167,6 +170,55 @@ public class WorldObserver {
                 );
                 blackboard.publishEvent(event);
             }
+        }
+    }
+
+    private void publishSunTransitionEvent(MinecraftServer server, boolean sunrise) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            String uuid = player.getUUID().toString();
+            if (!blackboard.hasPlayer(uuid)) continue;
+
+            int hearts = (int) Math.ceil(player.getHealth() / 2);
+            int food = player.getFoodData().getFoodLevel();
+            int nearbyHostiles = countNearbyHostiles(player, 10.0D);
+
+            String prompt;
+            if (sunrise) {
+                if (nearbyHostiles >= 2) {
+                    prompt = "Amanecer verificado: ya casi sale el sol y [nombre] tiene " + hearts + " corazones con " + nearbyHostiles + " hostiles cerca. Dale una frase de aguante y supervivencia.";
+                } else if (hearts <= 5 || food <= 8) {
+                    prompt = "Amanecer verificado: [nombre] aguanto la noche pero está tocado (" + hearts + " corazones, hambre " + food + "/20). Di algo breve de recuperación.";
+                } else {
+                    prompt = "Amanecer verificado: salió el sol y [nombre] sigue en pie. Comenta algo breve y natural.";
+                }
+            } else {
+                if (hearts <= 5 || food <= 8) {
+                    prompt = "Anochecer verificado: se viene la noche y [nombre] está vulnerable (" + hearts + " corazones, hambre " + food + "/20). Da un aviso breve y útil.";
+                } else {
+                    prompt = "Anochecer verificado: cayó la noche para [nombre]. Haz un comentario corto de cautela.";
+                }
+            }
+
+            BotEvent event = new BotEvent(
+                    player.getUUID(),
+                    prompt,
+                    Impact.NORMAL,
+                    System.currentTimeMillis(),
+                    false
+            );
+            blackboard.publishEvent(event);
+        }
+    }
+
+    private int countNearbyHostiles(ServerPlayer player, double radius) {
+        try {
+            AABB box = new AABB(
+                    player.getX() - radius, player.getY() - 5, player.getZ() - radius,
+                    player.getX() + radius, player.getY() + 5, player.getZ() + radius
+            );
+            return ((ServerLevel) player.level()).getEntitiesOfClass(Monster.class, box).size();
+        } catch (Exception e) {
+            return 0;
         }
     }
 

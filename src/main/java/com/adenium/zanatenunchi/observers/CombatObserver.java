@@ -8,6 +8,8 @@ import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class CombatObserver {
@@ -15,6 +17,8 @@ public class CombatObserver {
     private static final Logger LOGGER = LoggerFactory.getLogger("CombatObserver");
 
     private final Blackboard blackboard;
+    private final Map<String, Long> lastStrongHitMs = new ConcurrentHashMap<>();
+    private static final long STRONG_HIT_COOLDOWN_MS = 8_000L;
 
     public CombatObserver(Blackboard blackboard) {
         this.blackboard = blackboard;
@@ -102,16 +106,27 @@ public class CombatObserver {
     private void registerPlayerDamage() {
         ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> {
             if (!(entity instanceof ServerPlayer player)) return;
-            if (baseDamageTaken < 7.0f) return;
-            if (ThreadLocalRandom.current().nextInt(100) >= 30) return;
+            if (player.isDeadOrDying()) return;
+
+            // ~3 corazones de daño real o más (6 puntos) merece aviso.
+            if (damageTaken < 6.0f) return;
+
+            String uuid = player.getUUID().toString();
+            long now = System.currentTimeMillis();
+            long last = lastStrongHitMs.getOrDefault(uuid, 0L);
+            if ((now - last) < STRONG_HIT_COOLDOWN_MS) return;
+            lastStrongHitMs.put(uuid, now);
 
             String attackerName = source.getEntity() != null
                     ? source.getEntity().getName().getString() : null;
+            String cause = source.getMsgId();
             int hearts = (int) Math.ceil(player.getHealth() / 2);
             int damage = (int) Math.ceil(damageTaken / 2);
 
             String prompt;
-            if (attackerName != null) {
+            if ("fall".equals(cause)) {
+                prompt = "Golpe verificado: [nombre] sufrió una caída fuerte (-" + damage + " corazones). Le quedan " + hearts + " corazones.";
+            } else if (attackerName != null) {
                 prompt = "Golpe verificado: " + attackerName + " golpeó fuerte a [nombre] (-" + damage + " corazones). Le quedan " + hearts + " corazones.";
             } else {
                 prompt = "Golpe verificado: [nombre] recibió un golpe fuerte (-" + damage + " corazones). Le quedan " + hearts + " corazones.";

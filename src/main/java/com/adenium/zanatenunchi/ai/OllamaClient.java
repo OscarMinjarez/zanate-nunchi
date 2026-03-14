@@ -70,24 +70,26 @@ public class OllamaClient {
         body.addProperty("stream", false);
 
         JsonObject options = new JsonObject();
-        options.addProperty("temperature", impact == BotEvent.Impact.HIGH ? 0.15 : 0.25);
-        options.addProperty("top_p", 0.8);
+        options.addProperty("temperature", impact == BotEvent.Impact.HIGH ? 0.22 : 0.42);
+        options.addProperty("top_p", impact == BotEvent.Impact.HIGH ? 0.85 : 0.9);
         options.addProperty("repeat_penalty", 1.15);
         if (impact != null) {
             options.addProperty("num_predict", switch (impact) {
-                case LOW -> 20;
-                case NORMAL -> 28;
-                case HIGH -> 20;
+                case LOW -> 36;
+                case NORMAL -> 52;
+                case HIGH -> 22;
             });
         }
         body.add("options", options);
 
         int requestTimeoutSeconds = config.getOllamaTimeoutSeconds();
+        
+        // Timeouts por impacto: HIGH prioriza velocidad; LOW/NORMAL priorizan completitud.
         if (impact != null) {
             requestTimeoutSeconds = Math.min(requestTimeoutSeconds, switch (impact) {
-                case LOW -> 8;
-                case NORMAL -> 10;
-                case HIGH -> 9;
+                case LOW -> 16;
+                case NORMAL -> 22;
+                case HIGH -> 10;
             });
         }
 

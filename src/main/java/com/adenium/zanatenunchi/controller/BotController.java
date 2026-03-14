@@ -29,6 +29,8 @@ import java.text.Normalizer;
 import java.net.http.HttpTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,8 +39,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class BotController {
 
@@ -60,6 +65,17 @@ public class BotController {
     private static final List<String> ASSISTANT_TONE_MARKERS = Arrays.asList(
             "como ia", "como asistente", "en que puedo ayudarte", "servicio al cliente", "estoy aqui para ayudarte"
     );
+    private static final List<String> URGENT_CHAT_TERMS = Arrays.asList(
+            "ayuda", "me muero", "casi muerto", "socorro", "creeper", "esqueleto", "zombi", "zombie",
+            "araña", "arana", "me pegan", "sin vida", "1 corazon", "un corazon", "hambre"
+    );
+    private static final Pattern MULTIPLIER_COUNT_PATTERN = Pattern.compile("(\\d+)\\s*[x×]");
+    private static final Pattern HEARTS_PATTERN = Pattern.compile("tiene\\s+(\\d+)\\s+corazones");
+    private static final Pattern DISTANCE_PATTERN = Pattern.compile("~(\\d+)\\s+bloques");
+    private static final Pattern MOB_LIST_PAREN_PATTERN = Pattern.compile("\\(([^)]+)\\)");
+    private static final Pattern MOB_SINGULAR_PATTERN = Pattern.compile("hay un\\s+([a-záéíóúñ]+)|hay una\\s+([a-záéíóúñ]+)");
+    private static final int RECENT_REPLY_WINDOW = 3;
+    private static final long CRITICAL_HEALTH_REPLY_COOLDOWN_MS = 14_000L;
 
     private final Blackboard blackboard;
     private final OllamaClient ollamaClient;
@@ -69,6 +85,8 @@ public class BotController {
 
     private int tickCounter = 0;
     private final AtomicBoolean processing = new AtomicBoolean(false);
+    private final Map<String, Deque<String>> recentRepliesByPlayer = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastCriticalHealthReplyMs = new ConcurrentHashMap<>();
 
     public BotController(Blackboard blackboard, OllamaClient ollamaClient, PromptManager promptManager, DataManager dataManager) {
         this.blackboard = blackboard;
@@ -225,6 +243,13 @@ public class BotController {
         }
 
         if (event.neverIgnore()) {
+            if (isCriticalHealthPrompt(prompt)) {
+                long lastCritical = lastCriticalHealthReplyMs.getOrDefault(uuid, 0L);
+                if ((now - lastCritical) < CRITICAL_HEALTH_REPLY_COOLDOWN_MS) {
+                    return false;
+                }
+                lastCriticalHealthReplyMs.put(uuid, now);
+            }
             long lastHigh = blackboard.getLastHighEventMs(uuid);
             if ((now - lastHigh) < config.getHighEventCooldownMs()) {
                 return false;
@@ -380,15 +405,15 @@ public class BotController {
         try {
             String userPrompt = "MENSAJE LITERAL DEL JUGADOR: \"" + message + "\". " +
                     "Responde a ese mensaje. Usa el contexto solo como apoyo. No asumas metas, planes ni intenciones que el jugador no dijo.";
-            // Chat del jugador se trata como alta prioridad para bajar latencia percibida.
-            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history, BotEvent.Impact.HIGH);
-            reply = applyPostGuardrails(reply, BotEvent.Impact.HIGH, playerName);
+            BotEvent.Impact chatImpact = isUrgentChatMessage(message) ? BotEvent.Impact.HIGH : BotEvent.Impact.NORMAL;
+            String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history, chatImpact);
+            reply = applyPostGuardrails(reply, chatImpact, playerName);
             blackboard.addPlayerHistory(uuid, "assistant", reply, ollamaClient.getMaxHistory());
             dataManager.saveData();
             sendMessage(player, botName, reply);
             LOGGER.info("[{}] {}: {}", playerName, botName, reply);
         } catch (Exception e) {
-            String fallback = buildTimeoutReply(BotEvent.Impact.HIGH, playerName, true);
+            String fallback = buildTimeoutReply(BotEvent.Impact.NORMAL, playerName, true, message);
             blackboard.addPlayerHistory(uuid, "assistant", fallback, ollamaClient.getMaxHistory());
             dataManager.saveData();
             sendMessage(player, botName, fallback);
@@ -413,22 +438,13 @@ public class BotController {
         JsonArray history = getHistoryForEvent(uuid, event);
         LOGGER.debug("Prompt con nombre reemplazado: {}", prompt);
         try {
-            if (event.impact() == BotEvent.Impact.HIGH && isUrgentHighEvent(prompt)) {
-                String immediateReply = buildImmediateHighReply(playerName, prompt);
+            if (isImmediateDangerEvent(prompt, event.impact())) {
+                String immediateReply = buildImmediateDangerReply(playerName, prompt);
                 blackboard.addPlayerHistory(uuid, "assistant", immediateReply, ollamaClient.getMaxHistory());
                 dataManager.saveData();
                 sendMessage(player, botName, immediateReply);
                 LOGGER.info("[{}] {}: {}", playerName, botName, immediateReply);
                 return;
-            }
-
-            long delay = switch (event.impact()) {
-                case LOW -> ThreadLocalRandom.current().nextLong(50, 180);
-                case NORMAL -> ThreadLocalRandom.current().nextLong(80, 220);
-                case HIGH -> 0L;
-            };
-            if (delay > 0) {
-                Thread.sleep(delay);
             }
             if (event.impact() != BotEvent.Impact.HIGH && blackboard.hasHighPendingOrProcessing(event.playerUuid())) {
                 LOGGER.debug("Se descarta respuesta {} por llegada de HIGH para {}", event.impact(), uuid);
@@ -444,7 +460,7 @@ public class BotController {
             sendMessage(player, botName, reply);
             LOGGER.info("[{}] {}: {}", playerName, botName, reply);
         } catch (Exception e) {
-            String fallback = buildTimeoutReply(event.impact(), playerName, false);
+            String fallback = buildTimeoutReply(event.impact(), playerName, false, prompt);
             blackboard.addPlayerHistory(uuid, "assistant", fallback, ollamaClient.getMaxHistory());
             dataManager.saveData();
             sendMessage(player, botName, fallback);
@@ -581,7 +597,8 @@ public class BotController {
         String userPrompt = buildStrictEventUserPrompt(eventPrompt);
         String reply = ollamaClient.callOllama(systemPrompt, userPrompt, history, impact);
 
-        boolean shouldRetry = impact != BotEvent.Impact.HIGH;
+        boolean shouldRetry = impact == BotEvent.Impact.LOW
+                || (impact == BotEvent.Impact.NORMAL && !isImmediateDangerEvent(eventPrompt, impact));
         if (shouldRetry && isContradictoryEventReply(eventPrompt, reply)) {
             LOGGER.warn("Respuesta contradictoria detectada. Reintentando con guardrail fuerte. Evento='{}' Reply='{}'", eventPrompt, reply);
             String retrySystemPrompt = systemPrompt
@@ -617,7 +634,7 @@ public class BotController {
             normalized = ensureFinalPunctuation(normalized);
         }
 
-        if (isLikelyTruncated(normalized)) {
+        if (isLikelyTruncated(normalized) && normalized.length() < 24) {
             return buildFallbackReply(impact, playerName);
         }
 
@@ -653,9 +670,9 @@ public class BotController {
             return prefix + "mantente alerta.";
         }
         return switch (impact) {
-            case LOW -> prefix + "sigue con cuidado.";
-            case NORMAL -> prefix + "mantente alerta y actua con cuidado.";
-            case HIGH -> prefix + "peligro inmediato, reacciona ahora.";
+            case LOW -> prefix + chooseVariant("todo en orden por ahora, pero ojo.", "vas bien; no bajes la guardia.");
+            case NORMAL -> prefix + chooseVariant("sigue con cabeza fria, lo tienes.", "ojo con el entorno, pero sin panico.");
+            case HIGH -> prefix + chooseVariant("peligro inmediato, reacciona ya.", "esto se puso feo, muévete ahora.");
         };
     }
 
@@ -671,37 +688,148 @@ public class BotController {
                 || lower.contains("alerta verificada");
     }
 
-    private String buildImmediateHighReply(String playerName, String prompt) {
+    private boolean isImmediateDangerEvent(String prompt, BotEvent.Impact impact) {
+        if (impact == BotEvent.Impact.HIGH && isUrgentHighEvent(prompt)) {
+            return true;
+        }
+        String lower = prompt.toLowerCase(Locale.ROOT);
+        if (!lower.contains("alerta verificada")) {
+            return false;
+        }
+        int mobCount = extractMobCount(lower);
+        int hearts = extractHearts(lower);
+        int distance = extractDistance(lower);
+        return mobCount >= 4
+                || (distance > 0 && distance <= 2)
+                || (hearts > 0 && hearts <= 2)
+                || (hearts > 0 && hearts <= 3 && distance > 0 && distance <= 6);
+    }
+
+    private String buildImmediateDangerReply(String playerName, String prompt) {
         String prefix = (playerName != null && !playerName.isBlank()) ? playerName + ", " : "";
         String lower = prompt.toLowerCase(Locale.ROOT);
+        String mobs = extractMobSummary(prompt);
         if (lower.contains("muerte verificada") || lower.contains("murió") || lower.contains("mato") || lower.contains("mató")) {
-            return prefix + "baja confirmada, reagrupa y evita otra exposición.";
+            return prefix + "te bajaron; reaparece, respira y vuelve con plan corto.";
         }
-        if (lower.contains("casi muerto") || lower.contains("corazones")) {
-            return prefix + "salud critica, prioriza curarte ahora mismo.";
+        int hearts = extractHearts(lower);
+        int mobCount = extractMobCount(lower);
+        int distance = extractDistance(lower);
+
+        if (lower.contains("casi muerto") || (hearts > 0 && hearts <= 2)) {
+            if (hearts > 0 && hearts <= 2) {
+                return prefix + chooseVariant(
+                        "estas a un golpe, cubrete ya y curate en cuanto puedas.",
+                        "te soplan y te vas al lobby, cura primero.",
+                        "ni un intercambio mas: cobertura y curacion inmediata."
+                );
+            }
+            return prefix + "salud critica, corta pelea y curate ahora.";
         }
         if (lower.contains("se está muriendo de hambre") || lower.contains("hambre")) {
-            return prefix + "hambre critica, come de inmediato y busca cobertura.";
+            return prefix + "hambre critica, come ya y no te expongas.";
+        }
+        if (mobCount >= 4) {
+            return prefix + chooseVariant(
+                    "son demasiados hostiles encima (" + mobs + "), retrocede y rompe linea de vision.",
+                    "estas rodeado por " + mobs + ", kitea y busca cobertura ya.",
+                    "horda encima: " + mobs + "; retrocede en diagonal y gana espacio.",
+                    "si esto fuera speedrun al respawn, irias primero; sal de ahi ya."
+            );
+        }
+        if (distance > 0 && distance <= 2) {
+            return prefix + chooseVariant(
+                    "los tienes pegados (" + mobs + "), esquiva lateral y busca cobertura inmediata.",
+                    "estan encima (" + mobs + "), no intercambies golpes de frente.",
+                    "distancia critica con " + mobs + ", muévete ya y cubrete."
+            );
         }
         if (lower.contains("alerta verificada") || lower.contains("hay ")) {
-            return prefix + "amenaza cercana detectada, mantente en movimiento y cubrete.";
+            return prefix + chooseVariant(
+                    "tienes cerca a " + mobs + "; muévete, cubrete y pelea por espacio.",
+                    "ojo, vienen " + mobs + "; prioriza posicion y salida segura.",
+                    "atento: " + mobs + " cerca; no te quedes quieto.",
+                    "te estan cerrando el paso (" + mobs + "), gira y abre hueco."
+            );
         }
         return buildFallbackReply(BotEvent.Impact.HIGH, playerName);
     }
 
-    private String buildTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+    private String buildTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat, String context) {
         String prefix = (playerName != null && !playerName.isBlank()) ? playerName + ", " : "";
         if (fromChat) {
-            return prefix + "te leo; dame un instante y mantente alerta.";
+            return prefix + chooseVariant(
+                    "te leo, dame un segundo y te respondo bien.",
+                    "te contesto en nada, ando esquivando el caos.",
+                    "te escucho, deja que ordene idea rapido."
+            );
         }
+        
+        // Intentar dar una respuesta específica basada en el contexto si falla la IA
+        if (context != null) {
+            String lower = context.toLowerCase(Locale.ROOT);
+            int mobCount = extractMobCount(lower);
+            if (mobCount >= 4) return prefix + "muchos hostiles encima, retrocede y curarte primero.";
+            if (lower.contains("creeper")) return prefix + "creeper cerca, no te quedes quieto.";
+            if (lower.contains("zombi")) return prefix + "zombis cerca, retrocede y controla distancia.";
+            if (lower.contains("esqueleto")) return prefix + "esqueletos al frente, usa cobertura.";
+            if (lower.contains("araña")) return prefix + "arana encima, pegale y reposiciona.";
+            if (lower.contains("enderman")) return prefix + "enderman cerca, evita mirarlo y cubrete.";
+            if (lower.contains("bruja")) return prefix + "bruja cerca, evita intercambio largo.";
+            if (lower.contains("phantom") || lower.contains("fantasma")) return prefix + "fantasma encima, mueve y cubrete.";
+            
+            if (lower.contains("hambre")) return prefix + "come algo.";
+            if (lower.contains("salud") || lower.contains("corazones")) return prefix + "cuidado con la vida.";
+            if (lower.contains("lava")) return prefix + "¡Cuidado con la lava!";
+            if (lower.contains("caida") || lower.contains("caída")) return prefix + "¡Cuidado al bajar!";
+        }
+
         if (impact == null) {
             return prefix + "mantente alerta.";
         }
         return switch (impact) {
-            case LOW -> prefix + "recibido, sigo observando.";
-            case NORMAL -> prefix + "mantente alerta, estoy procesando la situación.";
-            case HIGH -> prefix + "peligro inmediato, ponte a salvo ahora.";
+            case LOW -> prefix + "sigo observando.";
+            case NORMAL -> prefix + chooseVariant("te cubro, dame un segundo.", "sigo contigo, responde con calma.");
+            case HIGH -> prefix + chooseVariant("peligro inmediato!", "esto esta picante, muévete ya!");
         };
+    }
+
+    private boolean isUrgentChatMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = normalizeForComparison(message);
+        for (String term : URGENT_CHAT_TERMS) {
+            if (lower.contains(term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int extractMobCount(String text) {
+        int count = 0;
+        Matcher matcher = MULTIPLIER_COUNT_PATTERN.matcher(text);
+        while (matcher.find()) {
+            count += Integer.parseInt(matcher.group(1));
+        }
+        if (count > 0) {
+            return count;
+        }
+        if (text.contains("hay un ") || text.contains("hay una ")) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private int extractHearts(String text) {
+        Matcher matcher = HEARTS_PATTERN.matcher(text);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : -1;
+    }
+
+    private int extractDistance(String text) {
+        Matcher matcher = DISTANCE_PATTERN.matcher(text);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : -1;
     }
 
     private boolean isTimeoutError(Exception e) {
@@ -922,10 +1050,104 @@ public class BotController {
 
     private void sendMessage(ServerPlayer player, String botName, String message) {
         if (player != null && player.connection != null) {
+            String finalMessage = diversifyRepeatedReply(player.getUUID().toString(), message);
             String prefix = config.getBotChatPrefix();
             String suffix = config.getBotChatSuffix();
-            player.sendSystemMessage(Component.literal(prefix + botName + ": " + suffix + message));
+            player.sendSystemMessage(Component.literal(prefix + botName + ": " + suffix + finalMessage));
         }
+    }
+
+    private String diversifyRepeatedReply(String playerUuid, String message) {
+        if (message == null || message.isBlank()) {
+            return message;
+        }
+        String normalized = normalizeForComparison(message);
+        Deque<String> history = recentRepliesByPlayer.computeIfAbsent(playerUuid, ignored -> new ArrayDeque<>());
+
+        if (!isRecentlyRepeated(history, normalized)) {
+            rememberReply(history, normalized);
+            return message;
+        }
+
+        String lower = normalized;
+        if (lower.contains("salud critica")) {
+            String variant = chooseVariant(
+                    "aguanta, curate primero y luego retomamos combate.",
+                    "prioriza vida: cubrete, come o pocion y recien peleas.",
+                    "no te regales, sana primero y reentra con mejor angulo."
+            );
+            rememberReply(history, normalizeForComparison(variant));
+            return variant;
+        }
+        if (lower.contains("amenaza") || lower.contains("hostiles") || lower.contains("zombi")
+                || lower.contains("creeper") || lower.contains("esqueleto") || lower.contains("arana")) {
+            String variant = chooseVariant(
+                    "te siguen presionando, gira, cubrete y corta linea de vision.",
+                    "manten movilidad y no pelees rodeado.",
+                    "respira, reposiciona y limpia uno por uno."
+            );
+            rememberReply(history, normalizeForComparison(variant));
+            return variant;
+        }
+        rememberReply(history, normalized);
+        return message;
+    }
+
+    private boolean isRecentlyRepeated(Deque<String> history, String normalizedMessage) {
+        synchronized (history) {
+            for (String recent : history) {
+                if (recent.equals(normalizedMessage)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private void rememberReply(Deque<String> history, String normalizedMessage) {
+        synchronized (history) {
+            if (history.size() >= RECENT_REPLY_WINDOW) {
+                history.removeFirst();
+            }
+            history.addLast(normalizedMessage);
+        }
+    }
+
+    private boolean isCriticalHealthPrompt(String prompt) {
+        String normalized = normalizeForComparison(prompt);
+        return normalized.contains("casi muerto")
+                || normalized.contains("le quedan solo 1 corazones")
+                || normalized.contains("le quedan solo 2 corazones")
+                || normalized.contains("le quedan solo 3 corazones")
+                || normalized.contains("tiene 1 corazones")
+                || normalized.contains("tiene 2 corazones");
+    }
+
+    private String chooseVariant(String... options) {
+        if (options == null || options.length == 0) {
+            return "mantente alerta.";
+        }
+        return options[ThreadLocalRandom.current().nextInt(options.length)];
+    }
+
+    private String extractMobSummary(String prompt) {
+        String lower = prompt.toLowerCase(Locale.ROOT);
+        Matcher grouped = MOB_LIST_PAREN_PATTERN.matcher(prompt);
+        if (grouped.find()) {
+            return grouped.group(1).trim();
+        }
+        if (lower.contains("creeper")) return "creeper";
+        if (lower.contains("esqueleto")) return "esqueleto";
+        if (lower.contains("zombi")) return "zombi";
+        if (lower.contains("araña") || lower.contains("arana")) return "arana";
+        Matcher singular = MOB_SINGULAR_PATTERN.matcher(lower);
+        if (singular.find()) {
+            String mob = singular.group(1) != null ? singular.group(1) : singular.group(2);
+            if (mob != null && !mob.isBlank()) {
+                return mob;
+            }
+        }
+        return "mobs hostiles";
     }
 }
 

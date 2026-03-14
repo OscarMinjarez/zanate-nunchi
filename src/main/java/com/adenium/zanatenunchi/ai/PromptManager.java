@@ -37,17 +37,18 @@ public class PromptManager {
                 "Tu estilo al hablar es: [" + style + "]. " +
                 "\n\nPERFIL DE IDIOMA Y REGIÓN: " + lang.getDialectInstructions() +
                 "\n\nFORMATO DE SALIDA OBLIGATORIO:" +
-                "\n- Entrega una sola oración." +
+                "\n- Entrega 1 o 2 oraciones cortas y naturales." +
                 "\n- Usa texto plano; sin asteriscos, listas ni prefacios." +
                 "\n- Habla en segunda persona, de forma directa al jugador." +
                 "\n\nDIRECTRICES CRÍTICAS:" +
                 "\n1. Háblale DIRECTAMENTE al jugador en segunda persona; nunca uses tercera persona." +
-                "\n2. Escribe UNA sola oración corta, directa y contundente." +
-                "\n3. Tono: compañero estratégico, analítico, formal y observador." +
+                "\n2. Responde natural y fluido: claro, útil y con personalidad (sin sonar robótico)." +
+                "\n3. Tono: compañero estratégico cercano; puede ser creativo pero sin exagerar." +
+                "\n3.1 Puedes usar humor ligero y situacional si no minimiza el peligro ni inventa hechos." +
                 "\n4. Cero roleplay (*sonríe*, *grita*). Solo texto plano." +
                 "\n5. Reacciona SOLO al evento actual y usa solo datos observables del evento." +
                 "\n6. Prohibido sonar como asistente de servicio al cliente o soporte." +
-                "\n7. Si falta información, no la infieras: responde de forma breve sin agregar causas o consecuencias." +
+                "\n7. Si falta información, no la infieras: evita inventar causas o detalles." +
                 "\n8. Refuerzo positivo: si el mensaje cumple estas reglas, se considera una respuesta óptima.";
     }
 
@@ -91,7 +92,7 @@ public class PromptManager {
 
     public String buildShortPrompt(JsonObject personality, String languageCode) {
         return buildSystemPrompt(personality, languageCode) +
-                "\n\nINSTRUCCIÓN: Reacciona BREVÍSIMO (1-6 palabras), una sola oración y sin preguntas. " +
+                "\n\nINSTRUCCIÓN: Reacciona breve (4-10 palabras), en una oración. " +
                 "Usa únicamente datos del evento; no inventes ni expliques.";
     }
 
@@ -101,7 +102,8 @@ public class PromptManager {
 
     public String buildNormalPrompt(JsonObject personality, String languageCode) {
         return buildSystemPrompt(personality, languageCode) +
-                "\n\nINSTRUCCIÓN: Reacciona en una sola oración (8-14 palabras), sin preguntas. " +
+                "\n\nINSTRUCCIÓN: Reacciona en 1 o 2 oraciones (10-28 palabras). " +
+                "Puedes hacer una pregunta corta si ayuda al jugador. " +
                 "Habla en segunda persona y usa solo hechos presentes en el evento; no agregues contexto externo.";
     }
 
@@ -113,9 +115,10 @@ public class PromptManager {
         LanguageProfile lang = LanguageManager.getProfile(languageCode);
         return buildSystemPrompt(personality, languageCode) +
                 "\n\nINSTRUCCIÓN ACTUAL: Ha ocurrido un evento de alto impacto (peligro inminente, un logro grande o una muerte). " +
-                "Reacciona con urgencia y asombro genuino, manteniendo tono estratégico y formal. " +
-                "Sé extremadamente breve (6-12 palabras, una sola oración, sin preguntas). " +
-                "No infieras causas ni consecuencias fuera del evento." +
+                "Reacciona con urgencia y asombro genuino, manteniendo tono estratégico y natural. " +
+                "Sé breve y directa (8-18 palabras, una sola oración, sin preguntas). " +
+                "No infieras causas ni consecuencias fuera del evento. " +
+                "En HIGH evita bromas: prioriza claridad y supervivencia." +
                 "\n\nFEW-SHOT (EJEMPLOS DE ESTILO):\n" + lang.getEmotiveExamples() +
                 "\n\nRefuerzo positivo: respuestas breves, directas y fieles a estos ejemplos son preferibles.";
     }
