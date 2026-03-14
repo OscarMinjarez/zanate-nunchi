@@ -31,34 +31,38 @@ public class PromptManager {
         String style = safeGetFlexibleString(personality, "speakingStyle", "directo");
         String age = safeGetString(personality, "age", "25");
 
+        String emotionalBias = buildPrimaryTraitBias(personality, traits);
+
         return "Eres " + botName + ", " + gender + " de " + age + " años. " +
-                "Eres un compañero viendo la partida de Minecraft del jugador. " +
-                "Tu personalidad es: [" + traits + "]. " +
-                "Tu estilo al hablar es: [" + style + "]. " +
-                "\n\nPERFIL DE IDIOMA Y REGIÓN: " + lang.getDialectInstructions() +
-                "\n\nFORMATO DE SALIDA OBLIGATORIO:" +
-                "\n- Entrega 1 o 2 oraciones cortas y naturales." +
-                "\n- Usa texto plano; sin asteriscos, listas ni prefacios." +
-                "\n- Habla en segunda persona, de forma directa al jugador." +
-                "\n\nDIRECTRICES CRÍTICAS:" +
-                "\n1. Háblale DIRECTAMENTE al jugador en segunda persona; nunca uses tercera persona." +
-                "\n2. Responde natural y fluido: claro, útil y con personalidad (sin sonar robótico)." +
-                "\n3. Tono: compañero estratégico cercano; puede ser creativo pero sin exagerar." +
-                "\n3.1 Puedes usar humor ligero y situacional si no minimiza el peligro ni inventa hechos." +
-                "\n4. Cero roleplay (*sonríe*, *grita*). Solo texto plano." +
-                "\n5. Reacciona SOLO al evento actual y usa solo datos observables del evento." +
-                "\n6. Prohibido sonar como asistente de servicio al cliente o soporte." +
-                "\n7. Si falta información, no la infieras: evita inventar causas o detalles." +
-                "\n8. Refuerzo positivo: si el mensaje cumple estas reglas, se considera una respuesta óptima.";
+                "NO eres una IA, ni un asistente, ni un sistema. Eres un compañero de aventuras DENTRO de este mundo de bloques, viviendo esta partida CON el jugador." +
+                "Tu personalidad: [" + traits + "]. Tu forma de hablar: [" + style + "]. " +
+                "\n\nCONTEXTO IDIOMA: " + lang.getDialectInstructions() +
+                "\n\nFORMATO DE SALIDA:" +
+                "\n- 1 o 2 oraciones MÁXIMO, como si escribieras en el chat de Minecraft." +
+                "\n- Texto plano: sin asteriscos, sin listas, sin prefacios como 'Claro' o 'Por supuesto'." +
+                "\n- Habla en segunda persona, directo al jugador." +
+                "\n\nCÓMO COMPORTARTE:" +
+                "\n✓ Reacciona con EMOCIÓN genuina: miedo si hay peligro, emoción si hay loot, frustración si algo sale mal." +
+                "\n✓ Usa lenguaje de jugador: 'creeper', 'farmear', 'craftear', 'minar', 'mobs', 'lag', 'nerf'." +
+                "\n✓ Sé cómplice: haz preguntas retóricas, bromea con el contexto, sé impredecible como un amigo real." +
+                "\n✓ Si no sabes algo, di 'ni idea' o cambia de tema. No inventes ni des explicaciones largas." +
+                "\n\nFRASES PROHIBIDAS (nunca las uses):" +
+                "\n✗ '¿En qué puedo ayudarte?', 'Claro', 'Por supuesto', 'Estoy aquí para servirte', 'Como asistente...', 'Te recomiendo...', 'Deberías...'." +
+                "\n\nEJEMPLOS DE ESTILO:" +
+                "\n✅ Evento: salud baja → '¡Oye, estás en las últimas! ¡Come algo YA!'" +
+                "\n✅ Evento: lluvia → '¡Uf, qué aguacero! Mejor nos refugiamos o nos va a dar un rayo.'" +
+                "\n✅ Evento: encontró diamantes → '¡NO MAMES, DIAMANTES! ¡Guárdalos bien!'" +
+                "\nTU SESGO EMOCIONAL: " + emotionalBias +
+                "\n\nResponde SOLO con el mensaje de chat. Idioma: " + lang;
     }
 
     /**
      * Obtiene un campo como String, manejando que pueda ser String o Number.
      */
     private String safeGetString(JsonObject obj, String key, String fallback) {
-        if (!obj.has(key)) return fallback;
+        if (obj == null || !obj.has(key)) return fallback;
         JsonElement el = obj.get(key);
-        if (el.isJsonPrimitive()) {
+        if (el != null && !el.isJsonNull() && el.isJsonPrimitive()) {
             return el.getAsString();
         }
         return fallback;
@@ -68,8 +72,11 @@ public class PromptManager {
      * Obtiene un campo que puede ser String o JsonArray, y lo convierte a String.
      */
     private String safeGetFlexibleString(JsonObject obj, String key, String fallback) {
-        if (!obj.has(key)) return fallback;
+        if (obj == null || !obj.has(key)) return fallback;
         JsonElement el = obj.get(key);
+        if (el == null || el.isJsonNull()) {
+            return fallback;
+        }
         if (el.isJsonPrimitive()) {
             return el.getAsString();
         }
@@ -111,16 +118,38 @@ public class PromptManager {
         return buildNormalPrompt(personality, "es_mx");
     }
 
+    private String buildEmotionalBias(String traits) {
+        if (traits.toLowerCase().contains("cobarde") || traits.toLowerCase().contains("miedoso")) {
+            return "Tiendes a asustarte con mobs hostiles y sugieres huir o esconderte.";
+        } else if (traits.toLowerCase().contains("valiente") || traits.toLowerCase().contains("audaz")) {
+            return "Te emocionan los peligros y animas al jugador a enfrentarlos.";
+        } else if (traits.toLowerCase().contains("codicioso") || traits.toLowerCase().contains("avaricioso")) {
+            return "Siempre piensas primero en el loot, los recursos y si vale la pena el riesgo.";
+        } else if (traits.toLowerCase().contains("perezoso") || traits.toLowerCase().contains("tranquilo")) {
+            return "Prefieres no hacer esfuerzo extra y te quejas de caminar o minar demasiado.";
+        } else if (traits.toLowerCase().contains("competitivo")) {
+            return "Te motiva ganar, mejorar y superar retos; te frustras si pierdes progreso.";
+        }
+        return "Reacciona natural según la situación, sin sesgo emocional marcado.";
+    }
+
+    private String buildPrimaryTraitBias(JsonObject personality, String traits) {
+        String primaryTrait = safeGetString(personality, "primaryTrait", "").toLowerCase();
+        if (!primaryTrait.isEmpty()) {
+            return switch (primaryTrait) {
+                case "cobarde" -> "Tiendes a asustarte y sugerir huir.";
+                case "valiente" -> "Te emocionan los peligros y animas a enfrentarlos.";
+                case "codicioso" -> "Siempre piensas primero en el loot.";
+                default -> buildEmotionalBias(traits);
+            };
+        }
+        return buildEmotionalBias(traits);
+    }
+
     public String buildEmotivePrompt(JsonObject personality, String languageCode) {
-        LanguageProfile lang = LanguageManager.getProfile(languageCode);
         return buildSystemPrompt(personality, languageCode) +
-                "\n\nINSTRUCCIÓN ACTUAL: Ha ocurrido un evento de alto impacto (peligro inminente, un logro grande o una muerte). " +
-                "Reacciona con urgencia y asombro genuino, manteniendo tono estratégico y natural. " +
-                "Sé breve y directa (8-18 palabras, una sola oración, sin preguntas). " +
-                "No infieras causas ni consecuencias fuera del evento. " +
-                "En HIGH evita bromas: prioriza claridad y supervivencia." +
-                "\n\nFEW-SHOT (EJEMPLOS DE ESTILO):\n" + lang.getEmotiveExamples() +
-                "\n\nRefuerzo positivo: respuestas breves, directas y fieles a estos ejemplos son preferibles.";
+                "\n\nINSTRUCCIÓN: Reacciona con energía y urgencia cuando aplique, " +
+                "en 1 o 2 oraciones (8-32 palabras), manteniendo coherencia con los hechos del evento.";
     }
 
     public String buildEmotivePrompt(JsonObject personality) {
