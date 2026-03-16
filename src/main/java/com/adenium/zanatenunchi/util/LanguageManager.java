@@ -1,8 +1,18 @@
 package com.adenium.zanatenunchi.util;
 
 import com.adenium.zanatenunchi.lang.AmericanEnglishProvider;
-import com.adenium.zanatenunchi.lang.IBotLanguageProvider;
+import com.adenium.zanatenunchi.lang.SpanishSpainProvider;
 import com.adenium.zanatenunchi.lang.MexicanSpanishProvider;
+import com.adenium.zanatenunchi.lang.PortugueseBrazilProvider;
+import com.adenium.zanatenunchi.lang.FrenchFranceProvider;
+import com.adenium.zanatenunchi.lang.GermanProvider;
+import com.adenium.zanatenunchi.lang.ItalianProvider;
+import com.adenium.zanatenunchi.lang.JapaneseProvider;
+import com.adenium.zanatenunchi.lang.KoreanProvider;
+import com.adenium.zanatenunchi.lang.ChineseSimplifiedProvider;
+import com.adenium.zanatenunchi.lang.RussianProvider;
+import com.adenium.zanatenunchi.lang.PolishProvider;
+import com.adenium.zanatenunchi.lang.IBotLanguageProvider;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -140,6 +150,31 @@ public class LanguageManager {
 
         PROVIDERS.put("es_mx", new MexicanSpanishProvider());
         PROVIDERS.put("en_us", new AmericanEnglishProvider());
+
+        // Register specific providers for the rest of the supported language codes
+        PROVIDERS.put("es_es", new SpanishSpainProvider());
+        PROVIDERS.put("es_ar", new SpanishSpainProvider());
+        PROVIDERS.put("es_cl", new SpanishSpainProvider());
+        PROVIDERS.put("es_co", new SpanishSpainProvider());
+        PROVIDERS.put("es_ve", new SpanishSpainProvider());
+
+        PROVIDERS.put("en_gb", new AmericanEnglishProvider());
+        PROVIDERS.put("en_au", new AmericanEnglishProvider());
+
+        PROVIDERS.put("pt_br", new PortugueseBrazilProvider());
+        PROVIDERS.put("pt_pt", new PortugueseBrazilProvider());
+
+        PROVIDERS.put("fr_fr", new FrenchFranceProvider());
+        PROVIDERS.put("fr_ca", new FrenchFranceProvider());
+
+        PROVIDERS.put("de_de", new GermanProvider());
+        PROVIDERS.put("it_it", new ItalianProvider());
+        PROVIDERS.put("ja_jp", new JapaneseProvider());
+        PROVIDERS.put("ko_kr", new KoreanProvider());
+        PROVIDERS.put("zh_cn", new ChineseSimplifiedProvider());
+        PROVIDERS.put("zh_tw", new ChineseSimplifiedProvider());
+        PROVIDERS.put("ru_ru", new RussianProvider());
+        PROVIDERS.put("pl_pl", new PolishProvider());
     }
 
     public static IBotLanguageProvider getProvider(String languageCode) {
@@ -239,3 +274,4 @@ public class LanguageManager {
         }
     }
 }
+
