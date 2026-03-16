@@ -39,6 +39,46 @@ public class ChineseSimplifiedProvider implements IBotLanguageProvider {
     public String getChatEvent(String playerName, String message) { return String.format("%s says: \"%s\"", playerName, message); }
 
     @Override
+    public String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension) {
+        if ("the_nether".equals(dimensionName)) {
+            return String.format("%s 刚刚进入了下界！对这个危险的地方做出反应。", playerName);
+        } else if ("the_end".equals(dimensionName)) {
+            return String.format("%s 进入了末地！强烈反应。", playerName);
+        } else {
+            return String.format("%s 刚刚从 %s 回来。对此发表评论。", playerName, previousDimension.replace("the_", "").replace("_", " "));
+        }
+    }
+
+    @Override
+    public String getWeatherEvent(String weatherType, boolean isStarting) {
+        if ("rain".equals(weatherType)) {
+            return isStarting ? "开始下雨了。评论一下天气。" : "雨停了。说点简短的。";
+        } else if ("thunder".equals(weatherType)) {
+            return "有雷暴！对此做出反应。";
+        }
+        return "天气发生了变化。";
+    }
+
+    @Override
+    public String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles) {
+        if ("sunrise".equals(timeOfDay)) {
+            if (nearbyHostiles >= 2) {
+                return String.format("日出：太阳升起了，但 %s 有 %d 心和 %d 个附近的敌对生物。告诉他们要活下去。", playerName, hearts, nearbyHostiles);
+            } else if (hearts <= 5 || food <= 8) {
+                return String.format("日出：%s 熬过了夜晚但很虚弱（%d 心，%d/20 饥饿）。建议他们恢复。", playerName, hearts, food);
+            } else {
+                return String.format("日出：太阳升起，%s 看起来没事。做一句简短自然的评论。", playerName);
+            }
+        } else { // sunset
+            if (hearts <= 5 || food <= 8) {
+                return String.format("日落：夜幕降临，%s 很脆弱（%d 心，%d/20 饥饿）。给出简短警告。", playerName, hearts, food);
+            } else {
+                return String.format("日落：夜晚降临于 %s。做一句短评并提醒小心。", playerName);
+            }
+        }
+    }
+
+    @Override
     public String getDamageEvent(String playerName, String cause, String attackerName, int damage, int heartsLeft) {
         if ("fall".equals(cause)) return String.format("事件: %s 因坠落受重伤（-%d 心）。还剩 %d 心。", playerName, damage, heartsLeft);
         if (attackerName != null && !attackerName.isEmpty()) return String.format("事件: %s 被 %s 重击（-%d 心）。还剩 %d 心。", playerName, attackerName, damage, heartsLeft);

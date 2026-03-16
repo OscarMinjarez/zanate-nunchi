@@ -41,6 +41,46 @@ public class PortugueseBrazilProvider implements IBotLanguageProvider {
     public String getChatEvent(String playerName, String message) { return String.format("%s says: \"%s\"", playerName, message); }
 
     @Override
+    public String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension) {
+        if ("the_nether".equals(dimensionName)) {
+            return String.format("%s acabou de entrar no Nether! Reaja a este lugar perigoso.", playerName);
+        } else if ("the_end".equals(dimensionName)) {
+            return String.format("%s entrou no End! Reaja com intensidade.", playerName);
+        } else {
+            return String.format("%s voltou do %s. Comente algo sobre isso.", playerName, previousDimension.replace("the_", "").replace("_", " "));
+        }
+    }
+
+    @Override
+    public String getWeatherEvent(String weatherType, boolean isStarting) {
+        if ("rain".equals(weatherType)) {
+            return isStarting ? "Começou a chover. Comente sobre o tempo." : "Parou de chover. Diga algo curto.";
+        } else if ("thunder".equals(weatherType)) {
+            return "Há uma tempestade com trovões! Reaja a isso.";
+        }
+        return "O tempo mudou.";
+    }
+
+    @Override
+    public String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles) {
+        if ("sunrise".equals(timeOfDay)) {
+            if (nearbyHostiles >= 2) {
+                return String.format("Amanhecer: O sol está nascendo, mas %s tem %d corações e %d hostis por perto. Diga para ele sobreviver.", playerName, hearts, nearbyHostiles);
+            } else if (hearts <= 5 || food <= 8) {
+                return String.format("Amanhecer: %s sobreviveu à noite mas está fraco (%d corações, %d/20 fome). Diga para recuperar.", playerName, hearts, food);
+            } else {
+                return String.format("Amanhecer: O sol nasceu e %s está bem. Faça um comentário curto e natural.", playerName);
+            }
+        } else {
+            if (hearts <= 5 || food <= 8) {
+                return String.format("Anoitecer: A noite está chegando e %s está vulnerável (%d corações, %d/20 fome). Dê um aviso breve.", playerName, hearts, food);
+            } else {
+                return String.format("Anoitecer: A noite caiu para %s. Faça um comentário curto aconselhando cautela.", playerName);
+            }
+        }
+    }
+
+    @Override
     public String getDamageEvent(String playerName, String cause, String attackerName, int damage, int heartsLeft) {
         if ("fall".equals(cause)) {
             return String.format("Evento: %s sofreu uma queda forte (-%d corações). Restam %d.", playerName, damage, heartsLeft);

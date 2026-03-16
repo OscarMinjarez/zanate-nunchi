@@ -94,17 +94,23 @@ public class CombatObserver {
             }
             String className = entity.getClass().getSimpleName();
             Impact impact = Impact.LOW;
-            // Filtros de probabilidad
-            if (className.equals("Creeper")) {
-                if (ThreadLocalRandom.current().nextInt(100) >= 25) {
+            // Jefes y mobs difíciles (Pase VIP directo)
+            if (className.equals("EnderDragon") || className.equals("WitherBoss") || className.equals("ElderGuardian") || className.equals("Warden") || className.equals("Evoker")) {
+                impact = Impact.HIGH;
+            }
+            // Mobs comunes de pelea (Prioridad NORMAL para que no se atore)
+            else if (className.equals("Zombie") || className.equals("Skeleton") || className.equals("Spider") || className.equals("Creeper") || className.equals("Pillager")) {
+                impact = Impact.NORMAL;
+                // Que reaccione el 40% de las veces para no spamear
+                if (ThreadLocalRandom.current().nextInt(100) >= 40) {
                     return;
                 }
-            } else if (!className.equals("EnderDragon") && !className.equals("WitherBoss") && !className.equals("ElderGuardian") && !className.equals("Warden") && !className.equals("Evoker")) {
+            }
+            // Mobs de relleno o pasivos (Vacas, ovejas, etc)
+            else {
                 if (ThreadLocalRandom.current().nextInt(100) >= 8) {
                     return;
                 }
-            } else {
-                impact = Impact.HIGH; // Jefes y mobs difíciles
             }
             String langCode = "en_us"; // Test MVP
             IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);

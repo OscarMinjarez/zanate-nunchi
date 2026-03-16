@@ -39,6 +39,46 @@ public class KoreanProvider implements IBotLanguageProvider {
     public String getChatEvent(String playerName, String message) { return String.format("%s says: \"%s\"", playerName, message); }
 
     @Override
+    public String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension) {
+        if ("the_nether".equals(dimensionName)) {
+            return String.format("%s 가 Nether에 들어갔습니다! 이 위험한 장소에 반응하세요.", playerName);
+        } else if ("the_end".equals(dimensionName)) {
+            return String.format("%s 가 End에 들어갔습니다! 강하게 반응하세요.", playerName);
+        } else {
+            return String.format("%s 가 %s 에서 돌아왔습니다. 이에 대해 코멘트하세요.", playerName, previousDimension.replace("the_", "").replace("_", " "));
+        }
+    }
+
+    @Override
+    public String getWeatherEvent(String weatherType, boolean isStarting) {
+        if ("rain".equals(weatherType)) {
+            return isStarting ? "비가 오기 시작했습니다. 날씨에 대해 말하세요." : "비가 그쳤습니다. 짧게 한마디 하세요.";
+        } else if ("thunder".equals(weatherType)) {
+            return "천둥번개가 치고 있습니다! 반응하세요.";
+        }
+        return "날씨가 변했습니다.";
+    }
+
+    @Override
+    public String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles) {
+        if ("sunrise".equals(timeOfDay)) {
+            if (nearbyHostiles >= 2) {
+                return String.format("일출: 해가 떠올랐지만 %s 은(는) 하트 %d 개와 %d 개의 적이 근처에 있습니다. 살아남으라고 말하세요.", playerName, hearts, nearbyHostiles);
+            } else if (hearts <= 5 || food <= 8) {
+                return String.format("일출: %s 은(는) 밤을 견뎌냈지만 약합니다（%d 하트, %d/20 배고픔）。회복하라고 말하세요.", playerName, hearts, food);
+            } else {
+                return String.format("일출: 해가 떴고 %s 은(는) 괜찮아 보입니다. 짧고 자연스러운 코멘트를 하세요.", playerName);
+            }
+        } else {
+            if (hearts <= 5 || food <= 8) {
+                return String.format("일몰: 밤이 오고 있고 %s 은(는) 취약합니다（%d 하트, %d/20 배고픔）。짧은 경고를 주세요.", playerName, hearts, food);
+            } else {
+                return String.format("일몰: %s 에게 밤이 찾아왔습니다. 짧은 주의 코멘트를 하세요.", playerName);
+            }
+        }
+    }
+
+    @Override
     public String getDamageEvent(String playerName, String cause, String attackerName, int damage, int heartsLeft) {
         if ("fall".equals(cause)) return String.format("이벤트: %s가 강한 추락 피해를 입었습니다(-%d 하트). 남은 하트: %d.", playerName, damage, heartsLeft);
         if (attackerName != null && !attackerName.isEmpty()) return String.format("이벤트: %s가 %s에게 강하게 맞았습니다(-%d 하트). 남은 하트: %d.", playerName, attackerName, damage, heartsLeft);

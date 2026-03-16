@@ -3,6 +3,8 @@ package com.adenium.zanatenunchi.observers;
 import com.adenium.zanatenunchi.blackboard.Blackboard;
 import com.adenium.zanatenunchi.blackboard.BotEvent;
 import com.adenium.zanatenunchi.blackboard.BotEvent.Impact;
+import com.adenium.zanatenunchi.lang.IBotLanguageProvider;
+import com.adenium.zanatenunchi.util.LanguageManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -79,17 +81,17 @@ public class WorldObserver {
 
             if (!wasRaining && isRaining && !isThundering) {
                 LOGGER.info("Detectado: empezó a llover");
-                publishWorldEvent(server, "Empezó a llover en el servidor. Comenta algo.", 100, Impact.NORMAL, true);
+                publishWeatherEvent(server, "rain", true, 100, Impact.NORMAL);
             }
 
             if (!wasThundering && isThundering) {
                 LOGGER.info("Detectado: tormenta eléctrica");
-                publishWorldEvent(server, "¡Hay tormenta eléctrica! Reacciona.", 100, Impact.NORMAL, true);
+                publishWeatherEvent(server, "thunder", true, 100, Impact.NORMAL);
             }
 
             if (wasRaining && !isRaining) {
                 LOGGER.info("Detectado: dejó de llover");
-                publishWorldEvent(server, "Dejó de llover. Di algo corto.", 40, Impact.LOW, false);
+                publishWeatherEvent(server, "rain", false, 40, Impact.LOW);
             }
         }
 
@@ -98,25 +100,52 @@ public class WorldObserver {
         blackboard.setWasThundering(isThundering);
     }
 
+    private void publishWeatherEvent(MinecraftServer server, String weatherType, boolean isStarting, int chancePercent, Impact impact) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            String uuid = player.getUUID().toString();
+            if (!blackboard.hasPlayer(uuid)) continue;
+
+            if (ThreadLocalRandom.current().nextInt(100) < chancePercent) {
+                String langCode = "en_us"; // Test MVP (Luego usaremos blackboard.getPlayerLanguage)
+                IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                String promptText = langProvider.getWeatherEvent(weatherType, isStarting);
+
+                BotEvent event = new BotEvent(
+                        player.getUUID(),
+                        promptText,
+                        impact,
+                        System.currentTimeMillis(),
+                        isStarting
+                );
+                blackboard.publishEvent(event);
+            }
+        }
+    }
+
     private void checkBiomeChanges(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             String uuid = player.getUUID().toString();
-
-            if (!blackboard.hasPlayer(uuid)) continue;
-
+            if (!blackboard.hasPlayer(uuid)) {
+                continue;
+            }
             String current = getBiomeName(player);
             String prev = blackboard.getLastBiome(uuid);
 
             if (prev != null && !current.equals(prev) && !current.equals("unknown") && NOTABLE_BIOMES.contains(current)) {
+                String langCode = "en_us"; // Test MVP
+                IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                String playerName = player.getName().getString();
+                String promptText = langProvider.getBiomeChangeEvent(playerName, current);
+
                 BotEvent event = new BotEvent(
                         player.getUUID(),
-                        "Cambio de bioma verificado: [nombre] entró a " + current.replace("_", " ") + ". Reacciona breve sin inventar.",
+                        promptText,
                         Impact.LOW,
-                        System.currentTimeMillis()
+                        System.currentTimeMillis(),
+                        false
                 );
                 blackboard.publishEvent(event);
             }
-
             if (!current.equals("unknown")) {
                 blackboard.setLastBiome(uuid, current);
             }
@@ -133,19 +162,19 @@ public class WorldObserver {
             String prev = blackboard.getLastDimension(uuid);
 
             if (prev != null && !current.equals(prev)) {
-                String prompt = switch (current) {
-                    case "the_nether" -> "¡[nombre] acaba de entrar al Nether! Reacciona.";
-                    case "the_end" -> "¡[nombre] entró al End! Reacciona con intensidad.";
-                    case "overworld" -> "[nombre] volvió del " + prev.replace("the_", "").replace("_", " ") + ". Comenta algo.";
-                    default -> null;
-                };
+                String langCode = "en_us"; // Test MVP
+                IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                String playerName = player.getName().getString();
 
-                if (prompt != null) {
+                String promptText = langProvider.getDimensionChangeEvent(playerName, current, prev);
+
+                if (promptText != null) {
                     BotEvent event = new BotEvent(
                             player.getUUID(),
-                            prompt,
+                            promptText,
                             Impact.NORMAL,
-                            System.currentTimeMillis()
+                            System.currentTimeMillis(),
+                            false
                     );
                     blackboard.publishEvent(event);
                 }
@@ -155,53 +184,25 @@ public class WorldObserver {
         }
     }
 
-    private void publishWorldEvent(MinecraftServer server, String prompt, int chancePercent, Impact impact, boolean neverIgnore) {
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            String uuid = player.getUUID().toString();
-            if (!blackboard.hasPlayer(uuid)) continue;
-
-            if (ThreadLocalRandom.current().nextInt(100) < chancePercent) {
-                BotEvent event = new BotEvent(
-                        player.getUUID(),
-                        prompt,
-                        impact,
-                        System.currentTimeMillis(),
-                        neverIgnore
-                );
-                blackboard.publishEvent(event);
-            }
-        }
-    }
-
     private void publishSunTransitionEvent(MinecraftServer server, boolean sunrise) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             String uuid = player.getUUID().toString();
             if (!blackboard.hasPlayer(uuid)) continue;
 
+            String langCode = "en_us"; // Test MVP
+            IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+            String playerName = player.getName().getString();
+
             int hearts = (int) Math.ceil(player.getHealth() / 2);
             int food = player.getFoodData().getFoodLevel();
             int nearbyHostiles = countNearbyHostiles(player, 10.0D);
 
-            String prompt;
-            if (sunrise) {
-                if (nearbyHostiles >= 2) {
-                    prompt = "Amanecer verificado: ya casi sale el sol y [nombre] tiene " + hearts + " corazones con " + nearbyHostiles + " hostiles cerca. Dale una frase de aguante y supervivencia.";
-                } else if (hearts <= 5 || food <= 8) {
-                    prompt = "Amanecer verificado: [nombre] aguanto la noche pero está tocado (" + hearts + " corazones, hambre " + food + "/20). Di algo breve de recuperación.";
-                } else {
-                    prompt = "Amanecer verificado: salió el sol y [nombre] sigue en pie. Comenta algo breve y natural.";
-                }
-            } else {
-                if (hearts <= 5 || food <= 8) {
-                    prompt = "Anochecer verificado: se viene la noche y [nombre] está vulnerable (" + hearts + " corazones, hambre " + food + "/20). Da un aviso breve y útil.";
-                } else {
-                    prompt = "Anochecer verificado: cayó la noche para [nombre]. Haz un comentario corto de cautela.";
-                }
-            }
+            String timeOfDay = sunrise ? "sunrise" : "sunset";
+            String promptText = langProvider.getTimeEvent(timeOfDay, playerName, hearts, food, nearbyHostiles);
 
             BotEvent event = new BotEvent(
                     player.getUUID(),
-                    prompt,
+                    promptText,
                     Impact.NORMAL,
                     System.currentTimeMillis(),
                     false
@@ -248,6 +249,3 @@ public class WorldObserver {
         }
     }
 }
-
-
-

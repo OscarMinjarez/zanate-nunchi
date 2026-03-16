@@ -74,4 +74,44 @@ public class MexicanSpanishProvider implements IBotLanguageProvider {
             return String.format("Evento: %s mató a un %s. Haz un comentario casual sobre la pelea.", playerName, mobName);
         }
     }
+
+    @Override
+    public String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension) {
+        if (dimensionName.equals("the_nether")) {
+            return String.format("¡%s acaba de entrar al Nether! Reacciona a este lugar peligroso.", playerName);
+        } else if (dimensionName.equals("the_end")) {
+            return String.format("¡%s entró al End! Reacciona con intensidad.", playerName);
+        } else {
+            return String.format("%s volvió del %s. Comenta algo al respecto.", playerName, previousDimension.replace("the_", "").replace("_", " "));
+        }
+    }
+
+    @Override
+    public String getWeatherEvent(String weatherType, boolean isStarting) {
+        if (weatherType.equals("rain")) {
+            return isStarting ? "Empezó a llover. Haz un comentario sobre el clima." : "Dejó de llover. Di algo corto.";
+        } else if (weatherType.equals("thunder")) {
+            return "¡Hay una tormenta eléctrica! Reacciona.";
+        }
+        return "El clima cambió.";
+    }
+
+    @Override
+    public String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles) {
+        if (timeOfDay.equals("sunrise")) {
+            if (nearbyHostiles >= 2) {
+                return String.format("Amanecer: Ya salió el sol, pero %s tiene %d corazones y %d hostiles cerca. Dale ánimos para sobrevivir.", playerName, hearts, nearbyHostiles);
+            } else if (hearts <= 5 || food <= 8) {
+                return String.format("Amanecer: %s aguantó la noche pero está débil (%d corazones, %d/20 hambre). Dile que se recupere.", playerName, hearts, food);
+            } else {
+                return String.format("Amanecer: Salió el sol y %s está bien. Comenta algo breve y natural.", playerName);
+            }
+        } else {
+            if (hearts <= 5 || food <= 8) {
+                return String.format("Anochecer: Se viene la noche y %s está vulnerable (%d corazones, %d/20 hambre). Da una advertencia breve.", playerName, hearts, food);
+            } else {
+                return String.format("Anochecer: Cayó la noche para %s. Haz un comentario corto de cautela.", playerName);
+            }
+        }
+    }
 }

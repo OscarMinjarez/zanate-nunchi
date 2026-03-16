@@ -39,6 +39,46 @@ public class RussianProvider implements IBotLanguageProvider {
     public String getChatEvent(String playerName, String message) { return String.format("%s says: \"%s\"", playerName, message); }
 
     @Override
+    public String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension) {
+        if ("the_nether".equals(dimensionName)) {
+            return String.format("%s только что вошёл в Нижний мир! Отреагируй на это опасное место.", playerName);
+        } else if ("the_end".equals(dimensionName)) {
+            return String.format("%s вошёл в Эндер! Отреагируй с интенсивностью.", playerName);
+        } else {
+            return String.format("%s вернулся из %s. Прокомментируй это.", playerName, previousDimension.replace("the_", "").replace("_", " "));
+        }
+    }
+
+    @Override
+    public String getWeatherEvent(String weatherType, boolean isStarting) {
+        if ("rain".equals(weatherType)) {
+            return isStarting ? "Начался дождь. Прокомментируй погоду." : "Дождь прекратился. Скажи что-нибудь короткое.";
+        } else if ("thunder".equals(weatherType)) {
+            return "Идёт гроза! Отреагируй.";
+        }
+        return "Погода изменилась.";
+    }
+
+    @Override
+    public String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles) {
+        if ("sunrise".equals(timeOfDay)) {
+            if (nearbyHostiles >= 2) {
+                return String.format("Рассвет: Солнце встаёт, но у %s %d сердец и %d враждебных сущностей рядом. Скажи им выжить.", playerName, hearts, nearbyHostiles);
+            } else if (hearts <= 5 || food <= 8) {
+                return String.format("Рассвет: %s пережил ночь, но слаб (%d сердец, %d/20 голода). Скажи им восстановиться.", playerName, hearts, food);
+            } else {
+                return String.format("Рассвет: Солнце взошло и %s в порядке. Коротко прокомментируй.", playerName);
+            }
+        } else {
+            if (hearts <= 5 || food <= 8) {
+                return String.format("Закат: Ночь наступает и %s уязвим (%d сердец, %d/20 голода). Дай короткое предупреждение.", playerName, hearts, food);
+            } else {
+                return String.format("Закат: Ночь настала для %s. Сделай короткий комментарий с предупреждением.", playerName);
+            }
+        }
+    }
+
+    @Override
     public String getDamageEvent(String playerName, String cause, String attackerName, int damage, int heartsLeft) {
         if ("fall".equals(cause)) return String.format("Событие: %s получил серьёзное падение (-%d сердец). Осталось %d сердец.", playerName, damage, heartsLeft);
         if (attackerName != null && !attackerName.isEmpty()) return String.format("Событие: %s был сильно поражён %s (-%d сердец). Осталось %d сердец.", playerName, attackerName, damage, heartsLeft);

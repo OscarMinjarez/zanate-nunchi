@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -28,9 +27,10 @@ public class PlayerStatusObserver {
     private final Map<String, Long> lastDangerEventMsByPlayer = new HashMap<>();
     private int tickCounter = 0;
 
-    private static final long NORMAL_DANGER_MIN_INTERVAL_MS = 9_000L;
-    private static final long CRITICAL_DANGER_MIN_INTERVAL_MS = 8_000L;
-    private static final long SAME_SIGNATURE_SUPPRESS_MS = 24_000L;
+    // Tiempos de enfriamiento aumentados para evitar el malviaje y spam a Ollama
+    private static final long NORMAL_DANGER_MIN_INTERVAL_MS = 25_000L;
+    private static final long CRITICAL_DANGER_MIN_INTERVAL_MS = 15_000L;
+    private static final long SAME_SIGNATURE_SUPPRESS_MS = 30_000L;
 
     private record DangerSnapshot(int hostiles, int hearts, int nearestDistance, String composition, boolean critical) {}
 
@@ -210,12 +210,8 @@ public class PlayerStatusObserver {
                         }
                     }
 
-                    // Si ya estaba marcado en peligro, solo reenviar cuando hay escalada critica.
-                    // (ahora se decide con snapshot + ventanas de tiempo para evitar spam)
-
                     String prompt;
                     if (hostiles.size() > 3) {
-                        // Muchos mobs: listar tipos únicos
                         java.util.LinkedHashSet<String> types = new java.util.LinkedHashSet<>();
                         for (var mob : hostiles) {
                             types.add(mob.getName().getString());
@@ -261,17 +257,11 @@ public class PlayerStatusObserver {
     }
 
     private boolean shouldPublishDangerUpdate(DangerSnapshot previous, DangerSnapshot current, long elapsedMs) {
-        if (previous == null) {
-            return true;
-        }
-        if (isDangerEscalation(previous, current)) {
-            return true;
-        }
+        if (previous == null) return true;
+        if (isDangerEscalation(previous, current)) return true;
 
         long minInterval = current.critical ? CRITICAL_DANGER_MIN_INTERVAL_MS : NORMAL_DANGER_MIN_INTERVAL_MS;
-        if (elapsedMs < minInterval) {
-            return false;
-        }
+        if (elapsedMs < minInterval) return false;
 
         if (buildDangerSignature(previous).equals(buildDangerSignature(current))
                 && elapsedMs < SAME_SIGNATURE_SUPPRESS_MS) {
@@ -281,18 +271,9 @@ public class PlayerStatusObserver {
     }
 
     private boolean isDangerEscalation(DangerSnapshot previous, DangerSnapshot current) {
-        if (!previous.critical && current.critical) {
-            return true;
-        }
-        if (current.hostiles >= previous.hostiles + 1) {
-            return true;
-        }
-        if (current.nearestDistance <= previous.nearestDistance - 2) {
-            return true;
-        }
-        if (current.hearts <= previous.hearts - 2) {
-            return true;
-        }
+        // Solo romper el silencio si te bajan la vida o te caen 3 mobs extra de golpe
+        if (current.hearts < previous.hearts) return true;
+        if (current.hostiles >= previous.hostiles + 3) return true;
         return false;
     }
 
@@ -304,15 +285,11 @@ public class PlayerStatusObserver {
     }
 
     private String buildCompositionSignature(Map<String, Integer> counts) {
-        if (counts.isEmpty()) {
-            return "none";
-        }
+        if (counts.isEmpty()) return "none";
         return counts.entrySet().stream()
                 .sorted((a, b) -> {
                     int countCompare = Integer.compare(b.getValue(), a.getValue());
-                    if (countCompare != 0) {
-                        return countCompare;
-                    }
+                    if (countCompare != 0) return countCompare;
                     return a.getKey().compareToIgnoreCase(b.getKey());
                 })
                 .limit(3)
@@ -393,5 +370,3 @@ public class PlayerStatusObserver {
         }
     }
 }
-
-

@@ -74,4 +74,44 @@ public class AmericanEnglishProvider implements IBotLanguageProvider {
             return String.format("Event: %s killed a %s. Make a casual comment about the fight.", playerName, mobName);
         }
     }
+
+    @Override
+    public String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension) {
+        if (dimensionName.equals("the_nether")) {
+            return String.format("%s just entered the Nether! React to this dangerous place.", playerName);
+        } else if (dimensionName.equals("the_end")) {
+            return String.format("%s entered the End! React with intensity to this final dimension.", playerName);
+        } else {
+            return String.format("%s came back from the %s. Make a comment about it.", playerName, previousDimension.replace("the_", "").replace("_", " "));
+        }
+    }
+
+    @Override
+    public String getWeatherEvent(String weatherType, boolean isStarting) {
+        if (weatherType.equals("rain")) {
+            return isStarting ? "It just started raining. Comment on the weather." : "It stopped raining. Say something short.";
+        } else if (weatherType.equals("thunder")) {
+            return "There's a thunderstorm happening! React to it.";
+        }
+        return "Weather changed.";
+    }
+
+    @Override
+    public String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles) {
+        if (timeOfDay.equals("sunrise")) {
+            if (nearbyHostiles >= 2) {
+                return String.format("Sunrise: The sun is coming up, but %s has %d hearts and %d hostiles nearby. Tell them to survive.", playerName, hearts, nearbyHostiles);
+            } else if (hearts <= 5 || food <= 8) {
+                return String.format("Sunrise: %s survived the night but is weak (%d hearts, %d/20 food). Tell them to recover.", playerName, hearts, food);
+            } else {
+                return String.format("Sunrise: The sun is up and %s is fine. Make a short, natural comment.", playerName);
+            }
+        } else { // sunset
+            if (hearts <= 5 || food <= 8) {
+                return String.format("Sunset: Night is falling and %s is vulnerable (%d hearts, %d/20 food). Give a brief warning.", playerName, hearts, food);
+            } else {
+                return String.format("Sunset: Night just fell for %s. Make a short comment advising caution.", playerName);
+            }
+        }
+    }
 }
