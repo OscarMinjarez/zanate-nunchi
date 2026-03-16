@@ -1,5 +1,19 @@
 package com.adenium.zanatenunchi.util;
 
+import com.adenium.zanatenunchi.lang.AmericanEnglishProvider;
+import com.adenium.zanatenunchi.lang.SpanishSpainProvider;
+import com.adenium.zanatenunchi.lang.MexicanSpanishProvider;
+import com.adenium.zanatenunchi.lang.PortugueseBrazilProvider;
+import com.adenium.zanatenunchi.lang.FrenchFranceProvider;
+import com.adenium.zanatenunchi.lang.GermanProvider;
+import com.adenium.zanatenunchi.lang.ItalianProvider;
+import com.adenium.zanatenunchi.lang.JapaneseProvider;
+import com.adenium.zanatenunchi.lang.KoreanProvider;
+import com.adenium.zanatenunchi.lang.ChineseSimplifiedProvider;
+import com.adenium.zanatenunchi.lang.RussianProvider;
+import com.adenium.zanatenunchi.lang.PolishProvider;
+import com.adenium.zanatenunchi.lang.IBotLanguageProvider;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -9,6 +23,7 @@ import java.util.Map;
 public class LanguageManager {
 
     private static final Map<String, LanguageProfile> PROFILES = new HashMap<>();
+    private static final Map<String, IBotLanguageProvider> PROVIDERS = new HashMap<>();
 
     static {
         PROFILES.put("default", new LanguageProfile(
@@ -132,6 +147,45 @@ public class LanguageManager {
                 "pl_pl", "Polski", "polski",
                 "Mów jak przyjaciel na Discordzie: naturalnie, luźno, z emocjami. Jak między graczami."
         ));
+
+        PROVIDERS.put("es_mx", new MexicanSpanishProvider());
+        PROVIDERS.put("en_us", new AmericanEnglishProvider());
+
+        // Register specific providers for the rest of the supported language codes
+        PROVIDERS.put("es_es", new SpanishSpainProvider());
+        PROVIDERS.put("es_ar", new SpanishSpainProvider());
+        PROVIDERS.put("es_cl", new SpanishSpainProvider());
+        PROVIDERS.put("es_co", new SpanishSpainProvider());
+        PROVIDERS.put("es_ve", new SpanishSpainProvider());
+
+        PROVIDERS.put("en_gb", new AmericanEnglishProvider());
+        PROVIDERS.put("en_au", new AmericanEnglishProvider());
+
+        PROVIDERS.put("pt_br", new PortugueseBrazilProvider());
+        PROVIDERS.put("pt_pt", new PortugueseBrazilProvider());
+
+        PROVIDERS.put("fr_fr", new FrenchFranceProvider());
+        PROVIDERS.put("fr_ca", new FrenchFranceProvider());
+
+        PROVIDERS.put("de_de", new GermanProvider());
+        PROVIDERS.put("it_it", new ItalianProvider());
+        PROVIDERS.put("ja_jp", new JapaneseProvider());
+        PROVIDERS.put("ko_kr", new KoreanProvider());
+        PROVIDERS.put("zh_cn", new ChineseSimplifiedProvider());
+        PROVIDERS.put("zh_tw", new ChineseSimplifiedProvider());
+        PROVIDERS.put("ru_ru", new RussianProvider());
+        PROVIDERS.put("pl_pl", new PolishProvider());
+    }
+
+    public static IBotLanguageProvider getProvider(String languageCode) {
+        if (PROVIDERS.containsKey(languageCode)) {
+            return PROVIDERS.get(languageCode);
+        }
+        String baseCode = languageCode.split("_")[0];
+        if (baseCode.equals("en")) {
+            return PROVIDERS.get("en_us");
+        }
+        return PROVIDERS.get("es_mx");
     }
 
     public static LanguageProfile getProfile(String languageCode) {
@@ -187,175 +241,6 @@ public class LanguageManager {
             };
         }
 
-        public String getEmotiveExamples() {
-            return switch (code) {
-                case "es_mx" ->
-                        "1) ¡Oye, estás en las últimas! ¡Come algo YA!\n" +
-                                "2) ¡NO MAMES, DIAMANTES! ¡Guárdalos bien!\n" +
-                                "3) Ay no... se fue todo el progreso... ¿respawnamos?\n" +
-                                "4) ¡Creeper atrás! ¡Córrele, güey!\n" +
-                                "5) ¡Uf, qué susto! Casi nos mata ese esqueleto.";
-                case "es_ar" ->
-                        "1) ¡Che, estás en cero! ¡Comé algo, boludo!\n" +
-                                "2) ¡Qué grosa, diamantes! ¡No los pierdas!\n" +
-                                "3) Uy, qué pavo... ¿volvemos a intentarlo?\n" +
-                                "4) ¡Creeper atrás! ¡Corré, che!\n" +
-                                "5) ¡Uf, qué susto! Casi nos manda al carajo ese esqueleto.";
-                case "es_es" ->
-                        "1) ¡Oye, estás en las últimas! ¡Come algo, tío!\n" +
-                                "2) ¡Joder, diamantes! ¡Guárdalos bien!\n" +
-                                "3) Vaya... se fue todo... ¿reintentamos?\n" +
-                                "4) ¡Creeper detrás! ¡Corre, tío!\n" +
-                                "5) ¡Uf, qué susto! Casi nos mata ese esqueleto.";
-                case "es_cl" ->
-                        "1) ¡Weón, estás en cero! ¡Come algo!\n" +
-                                "2) ¡Ala, diamantes! ¡No los pierdas, po!\n" +
-                                "3) Qué lata... se fue todo... ¿lo intentamos de nuevo?\n" +
-                                "4) ¡Creeper atrás! ¡Corre, weón!\n" +
-                                "5) ¡Uf, qué susto! Casi nos mata ese esqueleto.";
-                case "es_co" ->
-                        "1) ¡Parce, estás en las últimas! ¡Come algo!\n" +
-                                "2) ¡Qué chimba, diamantes! ¡Guárdalos bien!\n" +
-                                "3) Uy no... se fue todo... ¿lo intentamos de nuevo?\n" +
-                                "4) ¡Creeper atrás! ¡Corre, parce!\n" +
-                                "5) ¡Uf, qué susto! Casi nos mata ese esqueleto.";
-                case "es_ve" ->
-                        "1) ¡Panita, estás en cero! ¡Come algo!\n" +
-                                "2) ¡Qué chévere, diamantes! ¡Guárdalos bien!\n" +
-                                "3) Uy no... se fue todo... ¿lo intentamos de nuevo?\n" +
-                                "4) ¡Creeper atrás! ¡Corre, panita!\n" +
-                                "5) ¡Uf, qué susto! Casi nos mata ese esqueleto.";
-                case "en_us" ->
-                        "1) Dude, you're at one heart! Eat something NOW!\n" +
-                                "2) NO WAY, DIAMONDS! Don't drop those!\n" +
-                                "3) Ah man... that sucked. Wanna try again?\n" +
-                                "4) Creeper behind you! RUN!\n" +
-                                "5) Whoa, that was close! That skeleton almost got us!";
-                case "en_gb" ->
-                        "1) Blimey, you're on one heart! Eat something, mate!\n" +
-                                "2) Cor, diamonds! Don't lose those!\n" +
-                                "3) Oh dear... that was rough. Try again?\n" +
-                                "4) Creeper behind! Run, mate!\n" +
-                                "5) Phew, that was close! That skeleton nearly got us!";
-                case "en_au" ->
-                        "1) Mate, you're on one heart! Eat something, quick!\n" +
-                                "2) No way, diamonds! Don't drop 'em!\n" +
-                                "3) Ah, that was rough. Wanna have another go?\n" +
-                                "4) Creeper behind! Run, mate!\n" +
-                                "5) Crikey, that was close! That skele almost got us!";
-                case "pt_br" ->
-                        "1) Cara, você tá com um coração! Come algo AGORA!\n" +
-                                "2) CARACA, DIAMANTES! Não perde não!\n" +
-                                "3) Nossa... foi tudo... tenta de novo?\n" +
-                                "4) Creeper atrás! CORRE, mano!\n" +
-                                "5) Ufa, foi por pouco! Aquele esqueleto quase pegou a gente!";
-                case "pt_pt" ->
-                        "1) Epá, estás com um coração! Come algo, pá!\n" +
-                                "2) Caramba, diamantes! Não os percas!\n" +
-                                "3) Ai... foi-se tudo... tentamos outra vez?\n" +
-                                "4) Creeper atrás! Corre, pá!\n" +
-                                "5) Ufa, foi por pouco! Aquele esqueleto quase nos apanhou!";
-                case "fr_fr" ->
-                        "1) Mec, t'as plus qu'un cœur! Mange un truc, vite!\n" +
-                                "2) No way, des diamants! Garde-les bien!\n" +
-                                "3) Oh non... tout est parti... on réessaie?\n" +
-                                "4) Creeper derrière! Cours!\n" +
-                                "5) Ouf, c'était moins une! Ce squelette nous a presque eus!";
-                case "fr_ca" ->
-                        "1) Mon gars, t'as juste un cœur! Mange un truc, vite!\n" +
-                                "2) Wow, des diamants! Garde-les, là!\n" +
-                                "3) Ah non... tout est parti... on réessaie?\n" +
-                                "4) Creeper derrière! Cours, mon gars!\n" +
-                                "5) Ouf, c'était proche! Ce squelette nous a presque eus!";
-                case "de_de" ->
-                        "1) Alter, du hast nur noch ein Herz! Iss was, schnell!\n" +
-                                "2) Krass, Diamanten! Heb die auf!\n" +
-                                "3) Oh nein... alles weg... nochmal versuchen?\n" +
-                                "4) Creeper hinter dir! Lauf!\n" +
-                                "5) Puh, das war knapp! Das Skelett hat uns fast erwischt!";
-                case "it_it" ->
-                        "1) Amico, hai solo un cuore! Mangia qualcosa, subito!\n" +
-                                "2) Cavolo, diamanti! Non perderli!\n" +
-                                "3) Oh no... è andato tutto... riproviamo?\n" +
-                                "4) Creeper dietro! Corri!\n" +
-                                "5) Uff, ci siamo andati vicini! Quello scheletro quasi ci prendeva!";
-                case "ja_jp" ->
-                        "1) ねえ、ハートが1つしかない！何か食べて！\n" +
-                                "2) うわ、ダイヤモンド！絶対なくさないで！\n" +
-                                "3) しまった...全部失っちゃった...もう一度やる？\n" +
-                                "4) 後ろにクリーパー！逃げて！\n" +
-                                "5) 危なかった！あのスケルトンにやられそうだった！";
-                case "ko_kr" ->
-                        "1) 야, 하트가 하나밖에 없어! 뭐라도 먹어!\n" +
-                                "2) 대박, 다이아몬드! 절대 잃어버리지 마!\n" +
-                                "3) 맙소사... 다 날아갔어... 다시 해볼래?\n" +
-                                "4) 뒤에 크리퍼! 도망쳐!\n" +
-                                "5) 아찔했어! 저 스켈레톤이 거의 잡을 뻔 했어!";
-                case "zh_cn" ->
-                        "1) 喂，你只剩一颗心了！快吃点东西！\n" +
-                                "2) 哇，钻石！千万别丢！\n" +
-                                "3) 哎呀...全没了...再试一次？\n" +
-                                "4) 后面有苦力怕！快跑！\n" +
-                                "5) 好险！那个骷髅差点就把我们干掉了！";
-                case "zh_tw" ->
-                        "1) 喂，你只剩一顆心了！快吃點東西！\n" +
-                                "2) 哇，鑽石！千萬別丟！\n" +
-                                "3) 哎呀...全沒了...再試一次？\n" +
-                                "4) 後面有苦力怕！快跑！\n" +
-                                "5) 好險！那個骷髏差點就把我們幹掉了！";
-                case "ru_ru" ->
-                        "1) Эй, у тебя одно сердце! Съешь что-нибудь, быстро!\n" +
-                                "2) Ого, алмазы! Не потеряй их!\n" +
-                                "3) О нет... всё пропало... попробуем ещё раз?\n" +
-                                "4) Крипер сзади! Беги!\n" +
-                                "5) Фух, еле успели! Этот скелет почти нас достал!";
-                case "pl_pl" ->
-                        "1) Stary, masz tylko jedno serce! Zjedz coś, szybko!\n" +
-                                "2) O kurde, diamenty! Nie zgub ich!\n" +
-                                "3) O nie... wszystko przepadło... spróbujemy jeszcze raz?\n" +
-                                "4) Creeper za tobą! Uciekaj!\n" +
-                                "5) Uff, to było blisko! Ten szkielet prawie nas dorwał!";
-                default ->
-                        "1) Cuidado, tu salud es baja.\n" +
-                                "2) Excelente hallazgo.\n" +
-                                "3) Una situación lamentable.\n" +
-                                "4) ¡Creeper atrás! ¡Córrele!\n" +
-                                "5) ¡Uf, qué susto! Casi nos mata ese esqueleto.";
-            };
-        }
-
-        public String getGreetingPrompt() {
-            return switch (code.split("_")[0]) {
-                case "en" -> "Someone new just connected. Greet them casually and you MUST ask 'what's your name?' or 'what should I call you?'. You MUST ask for their name.";
-                case "pt" -> "Alguém novo conectou. Cumprimente de forma casual e DEVE perguntar 'qual seu nome?' ou 'como te chamo?'. OBRIGATÓRIO perguntar o nome.";
-                case "fr" -> "Quelqu'un de nouveau s'est connecté. Salue de façon décontractée et DOIS demander 'comment tu t'appelles?' ou 'c'est quoi ton nom?'. OBLIGATOIRE.";
-                case "de" -> "Jemand Neues ist eingetreten. Begrüße locker und frage UNBEDINGT 'wie heißt du?' oder 'wie soll ich dich nennen?'. PFLICHT.";
-                case "it" -> "Qualcuno di nuovo si è connesso. Saluta in modo casual e DEVI chiedere 'come ti chiami?' o 'qual è il tuo nome?'. OBBLIGATORIO.";
-                case "ja" -> "新しい人が接続しました。カジュアルに挨拶して、必ず「お名前は？」と聞いてください。必須。";
-                case "ko" -> "새로운 사람이 접속했습니다. 캐주얼하게 인사하고 반드시 '이름이 뭐예요?'라고 물어보세요. 필수.";
-                case "zh" -> "有新玩家加入了。轻松打招呼并且必须问'你叫什么名字？'。必须问名字。";
-                case "ru" -> "Кто-то новый подключился. Поздоровайся непринуждённо и ОБЯЗАТЕЛЬНО спроси 'как тебя зовут?'. Обязательно.";
-                case "pl" -> "Ktoś nowy się połączył. Przywitaj się luźno i MUSISZ zapytać 'jak masz na imię?'. OBOWIĄZKOWO.";
-                default -> "Alguien nuevo se conectó. Salúdalo de forma casual y DEBES preguntarle '¿cómo te llamas?' o '¿cuál es tu nombre?'. Es OBLIGATORIO que le preguntes su nombre.";
-            };
-        }
-
-        public String getNameReceivedPrompt(String playerName) {
-            return switch (code.split("_")[0]) {
-                case "en" -> "The player just told you their name is " + playerName + ". Greet them by name in a casual, friendly way.";
-                case "pt" -> "O jogador disse que se chama " + playerName + ". Cumprimente pelo nome de forma casual e amigável.";
-                case "fr" -> "Le joueur a dit qu'il s'appelle " + playerName + ". Salue-le par son nom de façon décontractée et amicale.";
-                case "de" -> "Der Spieler sagte, er heißt " + playerName + ". Begrüße ihn locker und freundlich mit Namen.";
-                case "it" -> "Il giocatore ha detto di chiamarsi " + playerName + ". Salutalo per nome in modo casual e amichevole.";
-                case "ja" -> "プレイヤーの名前は" + playerName + "だそうです。名前で呼んでフレンドリーに挨拶して。";
-                case "ko" -> "플레이어 이름이 " + playerName + "라고 했어. 이름으로 부르고 친근하게 인사해.";
-                case "zh" -> "玩家说他们叫" + playerName + "。用名字友好地打招呼。";
-                case "ru" -> "Игрок сказал, что его зовут " + playerName + ". Поздоровайся по имени дружелюбно.";
-                case "pl" -> "Gracz powiedział, że ma na imię " + playerName + ". Przywitaj się po imieniu przyjaźnie.";
-                default -> "El jugador te dijo que se llama " + playerName + ". Salúdalo por su nombre de forma casual y amigable.";
-            };
-        }
-
         public String getReturningPlayerPrompt(String playerName) {
             return switch (code.split("_")[0]) {
                 case "en" -> playerName + " just came back to the world. Welcome them like a friend you already know.";
@@ -389,3 +274,4 @@ public class LanguageManager {
         }
     }
 }
+
