@@ -3,6 +3,8 @@ package com.adenium.zanatenunchi.observers;
 import com.adenium.zanatenunchi.blackboard.Blackboard;
 import com.adenium.zanatenunchi.blackboard.BotEvent;
 import com.adenium.zanatenunchi.blackboard.BotEvent.Impact;
+import com.adenium.zanatenunchi.lang.IBotLanguageProvider;
+import com.adenium.zanatenunchi.util.LanguageManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.server.MinecraftServer;
@@ -27,7 +29,6 @@ public class PlayerStatusObserver {
     private final Map<String, Long> lastDangerEventMsByPlayer = new HashMap<>();
     private int tickCounter = 0;
 
-    // Tiempos de enfriamiento aumentados para evitar el malviaje y spam a Ollama
     private static final long NORMAL_DANGER_MIN_INTERVAL_MS = 25_000L;
     private static final long CRITICAL_DANGER_MIN_INTERVAL_MS = 15_000L;
     private static final long SAME_SIGNATURE_SUPPRESS_MS = 30_000L;
@@ -46,27 +47,34 @@ public class PlayerStatusObserver {
 
     private void registerBlockBreak() {
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-            if (!(player instanceof ServerPlayer serverPlayer)) return;
-
-            String reaction = null;
+            if (!(player instanceof ServerPlayer serverPlayer)) {
+                return;
+            }
+            String oreName = null;
             Impact impact = Impact.NORMAL;
             int y = pos.getY();
-
             if (state.is(Blocks.DIAMOND_ORE) || state.is(Blocks.DEEPSLATE_DIAMOND_ORE)) {
-                reaction = "Hallazgo verificado: [nombre] minó diamantes en Y=" + y + ". Reacciona con emoción sin inventar.";
+                oreName = "diamantes";
                 impact = Impact.HIGH;
             } else if (state.is(Blocks.ANCIENT_DEBRIS)) {
-                reaction = "Hallazgo verificado: [nombre] encontró ancient debris en Y=" + y + " en el Nether. Reacciona.";
+                oreName = "ancient debris";
                 impact = Impact.HIGH;
             } else if (state.is(Blocks.EMERALD_ORE) || state.is(Blocks.DEEPSLATE_EMERALD_ORE)) {
                 if (ThreadLocalRandom.current().nextInt(100) < 40) {
-                    reaction = "Hallazgo verificado: [nombre] encontró esmeraldas en Y=" + y + ". Comenta algo breve.";
+                    oreName = "esmeraldas";
                 }
             } else if (state.is(Blocks.SPAWNER)) {
-                reaction = "Hallazgo verificado: [nombre] encontró un spawner en Y=" + y + ". Reacciona.";
+                oreName = "un spawner";
             }
-
-            if (reaction != null) {
+            if (oreName != null) {
+                String uuid = serverPlayer.getUUID().toString();
+                String langCode = blackboard.getPlayerLanguage(uuid);
+                if (langCode == null) {
+                    langCode = "en_us";
+                }
+                IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                String playerName = serverPlayer.getName().getString();
+                String reaction = langProvider.getOreFoundEvent(playerName, oreName, y);
                 BotEvent event = new BotEvent(
                         serverPlayer.getUUID(),
                         reaction,
@@ -83,19 +91,19 @@ public class PlayerStatusObserver {
     }
 
     private void onServerTick(MinecraftServer server) {
-        if (server.getPlayerList().getPlayers().isEmpty()) return;
-
+        if (server.getPlayerList().getPlayers().isEmpty()) {
+            return;
+        }
         int tick = ++tickCounter;
-        if (tick % 40 != 0) return;
-
+        if (tick % 40 != 0) {
+            return;
+        }
         checkLowHealth(server);
         checkLowFood(server);
         checkNearbyDanger(server);
-
         if (tick % 200 == 0) {
             checkSpontaneousChat(server);
         }
-
         if (tickCounter >= 144000) {
             tickCounter = 0;
         }
@@ -104,21 +112,24 @@ public class PlayerStatusObserver {
     private void checkLowHealth(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             String uuid = player.getUUID().toString();
-
-            if (!blackboard.hasPlayer(uuid)) continue;
-            if (player.isDeadOrDying()) continue;
-
+            if (player.isDeadOrDying() || !blackboard.hasPlayer(uuid)) {
+                continue;
+            }
             float health = player.getHealth();
             boolean isLow = health <= 6.0f && health > 0;
             boolean wasLow = blackboard.isLowHealthWarned(uuid);
-
             if (isLow && !wasLow) {
                 blackboard.setLowHealthWarned(uuid, true);
                 int hearts = (int) Math.ceil(health / 2);
-
+                String langCode = blackboard.getPlayerLanguage(uuid);
+                if (langCode == null) {
+                    langCode = "en_us";
+                }
+                IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                String prompt = langProvider.getLowHealthEvent(player.getName().getString(), hearts);
                 BotEvent event = new BotEvent(
                         player.getUUID(),
-                        "¡[nombre] está casi muerto, le quedan solo " + hearts + " corazones! Reacciona ya.",
+                        prompt,
                         Impact.HIGH,
                         System.currentTimeMillis(),
                         true
@@ -133,19 +144,23 @@ public class PlayerStatusObserver {
     private void checkLowFood(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             String uuid = player.getUUID().toString();
-
-            if (!blackboard.hasPlayer(uuid)) continue;
-
+            if (!blackboard.hasPlayer(uuid)) {
+                continue;
+            }
             int food = player.getFoodData().getFoodLevel();
             boolean isLow = food <= 6;
             boolean wasLow = blackboard.isLowFoodWarned(uuid);
-
             if (isLow && !wasLow) {
                 blackboard.setLowFoodWarned(uuid, true);
-
+                String langCode = blackboard.getPlayerLanguage(uuid);
+                if (langCode == null) {
+                    langCode = "en_us";
+                }
+                IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                String prompt = langProvider.getLowFoodEvent(player.getName().getString());
                 BotEvent event = new BotEvent(
                         player.getUUID(),
-                        "¡[nombre] se está muriendo de hambre! Reacciona.",
+                        prompt,
                         Impact.HIGH,
                         System.currentTimeMillis(),
                         true
@@ -160,21 +175,20 @@ public class PlayerStatusObserver {
     private void checkNearbyDanger(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             String uuid = player.getUUID().toString();
-
-            if (!blackboard.hasPlayer(uuid)) continue;
-            if (player.isDeadOrDying()) continue;
-
+            if (!blackboard.hasPlayer(uuid)) {
+                continue;
+            }
+            if (player.isDeadOrDying()) {
+                continue;
+            }
             try {
                 AABB box = new AABB(
                         player.getX() - 12, player.getY() - 5, player.getZ() - 12,
                         player.getX() + 12, player.getY() + 5, player.getZ() + 12
                 );
-
                 var hostiles = ((ServerLevel) player.level()).getEntitiesOfClass(Monster.class, box);
-
                 boolean danger = !hostiles.isEmpty();
                 boolean wasInDanger = blackboard.isDangerWarned(uuid);
-
                 if (danger) {
                     blackboard.setDangerWarned(uuid, true);
                     int hearts = (int) Math.ceil(player.getHealth() / 2);
@@ -183,12 +197,10 @@ public class PlayerStatusObserver {
                             .min()
                             .orElse(0.0D);
                     int nearestDistanceRounded = Math.max(1, (int) Math.round(nearestDistance));
-
                     java.util.LinkedHashMap<String, Integer> counts = new java.util.LinkedHashMap<>();
                     for (var mob : hostiles) {
                         counts.merge(mob.getName().getString(), 1, Integer::sum);
                     }
-
                     boolean criticalDanger = hostiles.size() >= 4
                             || nearestDistance <= 2.0D
                             || hearts <= 2
@@ -200,7 +212,6 @@ public class PlayerStatusObserver {
                             buildCompositionSignature(counts),
                             criticalDanger
                     );
-
                     long now = System.currentTimeMillis();
                     if (wasInDanger) {
                         DangerSnapshot previousSnapshot = lastDangerSnapshotByPlayer.get(uuid);
@@ -209,32 +220,36 @@ public class PlayerStatusObserver {
                             continue;
                         }
                     }
-
-                    String prompt;
+                    String mobListStr;
                     if (hostiles.size() > 3) {
                         java.util.LinkedHashSet<String> types = new java.util.LinkedHashSet<>();
                         for (var mob : hostiles) {
                             types.add(mob.getName().getString());
-                            if (types.size() >= 3) break;
+                            if (types.size() >= 3) {
+                                break;
+                            }
                         }
-                        prompt = "Alerta verificada: hay " + hostiles.size() + " mobs hostiles cerca de [nombre] (" +
-                                String.join(", ", types) + "). Tiene " + hearts + " corazones. El más cercano está a ~" +
-                                nearestDistanceRounded + " bloques. Reacciona de inmediato.";
+                        mobListStr = hostiles.size() + " mobs (" + String.join(", ", types) + ")";
                     } else if (hostiles.size() > 1) {
-                        String mobList = counts.entrySet().stream()
+                        mobListStr = counts.entrySet().stream()
                                 .map(entry -> entry.getValue() + "× " + entry.getKey())
                                 .reduce((a, b) -> a + ", " + b)
-                                .orElse("mobs hostiles");
-                        prompt = "Alerta verificada: hay " + mobList + " cerca de [nombre]. Tiene " + hearts +
-                                " corazones. El más cercano está a ~" + nearestDistanceRounded + " bloques." +
-                                (criticalDanger ? " Reacciona de inmediato." : "");
+                                .orElse("mobs");
                     } else {
-                        String mobName = hostiles.get(0).getName().getString();
-                        prompt = "Alerta verificada: hay un " + mobName + " cerca de [nombre]. Tiene " + hearts +
-                                " corazones. Está a ~" + nearestDistanceRounded + " bloques." +
-                                (criticalDanger ? " Reacciona de inmediato." : "");
+                        mobListStr = "1× " + hostiles.get(0).getName().getString();
                     }
-
+                    String langCode = blackboard.getPlayerLanguage(uuid);
+                    if (langCode == null) {
+                        langCode = "en_us";
+                    }
+                    IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+                    String prompt = langProvider.getDangerAlertEvent(
+                            player.getName().getString(),
+                            mobListStr,
+                            hearts,
+                            nearestDistanceRounded,
+                            criticalDanger
+                    );
                     BotEvent event = new BotEvent(
                             player.getUUID(),
                             prompt,
@@ -257,12 +272,16 @@ public class PlayerStatusObserver {
     }
 
     private boolean shouldPublishDangerUpdate(DangerSnapshot previous, DangerSnapshot current, long elapsedMs) {
-        if (previous == null) return true;
-        if (isDangerEscalation(previous, current)) return true;
-
+        if (previous == null) {
+            return true;
+        }
+        if (isDangerEscalation(previous, current)) {
+            return true;
+        }
         long minInterval = current.critical ? CRITICAL_DANGER_MIN_INTERVAL_MS : NORMAL_DANGER_MIN_INTERVAL_MS;
-        if (elapsedMs < minInterval) return false;
-
+        if (elapsedMs < minInterval) {
+            return false;
+        }
         if (buildDangerSignature(previous).equals(buildDangerSignature(current))
                 && elapsedMs < SAME_SIGNATURE_SUPPRESS_MS) {
             return false;
@@ -271,7 +290,6 @@ public class PlayerStatusObserver {
     }
 
     private boolean isDangerEscalation(DangerSnapshot previous, DangerSnapshot current) {
-        // Solo romper el silencio si te bajan la vida o te caen 3 mobs extra de golpe
         if (current.hearts < previous.hearts) return true;
         if (current.hostiles >= previous.hostiles + 3) return true;
         return false;
@@ -302,41 +320,47 @@ public class PlayerStatusObserver {
         long now = System.currentTimeMillis();
         long spontMinMs = 7 * 60_000L;
         long spontMaxMs = 16 * 60_000L;
-
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             String uuid = player.getUUID().toString();
-
-            if (!blackboard.hasPlayer(uuid)) continue;
-            if (player.isDeadOrDying()) continue;
-
+            if (!blackboard.hasPlayer(uuid)) {
+                continue;
+            }
+            if (player.isDeadOrDying()) {
+                continue;
+            }
             Long next = blackboard.getNextSpontMs(uuid);
             if (next == null) {
                 blackboard.setNextSpontMs(uuid, now + spontMinMs + ThreadLocalRandom.current().nextLong(spontMaxMs - spontMinMs));
                 continue;
             }
-
-            if (now < next) continue;
-
+            if (now < next) {
+                continue;
+            }
             blackboard.setNextSpontMs(uuid, now + spontMinMs + ThreadLocalRandom.current().nextLong(spontMaxMs - spontMinMs));
-
             long dayTime = server.overworld().getDayTime() % 24000;
-            String timeDesc = dayTime < 1000 ? "acaba de amanecer" : dayTime < 6000 ? "es de mañana" :
-                    dayTime < 12000 ? "es mediodía" : dayTime < 13500 ? "está atardeciendo" :
-                            dayTime < 18000 ? "anocheció" : "es medianoche";
-
+            String timeKey = dayTime < 1000 ? "sunrise" : dayTime < 6000 ? "morning" :
+                    dayTime < 12000 ? "noon" : dayTime < 13500 ? "afternoon" :
+                            dayTime < 18000 ? "night" : "midnight";
             String biome = getBiomeName(player).replace("_", " ");
             String dim = getDimensionName(player).replace("the_", "").replace("_", " ");
             int hearts = (int) Math.ceil(player.getHealth() / 2);
             int food = player.getFoodData().getFoodLevel();
-
-            String estado = "[nombre] está en el " + dim + ", " + timeDesc +
-                    ", bioma: " + biome +
-                    ", vida: " + hearts + " corazones, hambre: " + food + "/20." +
-                    " Di algo espontáneo y natural sobre la situación.";
-
+            String langCode = blackboard.getPlayerLanguage(uuid);
+            if (langCode == null) {
+                langCode = "en_us";
+            }
+            IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
+            String prompt = langProvider.getSpontaneousEvent(
+                    player.getName().getString(),
+                    dim,
+                    timeKey,
+                    biome,
+                    hearts,
+                    food
+            );
             BotEvent event = new BotEvent(
                     player.getUUID(),
-                    estado,
+                    prompt,
                     Impact.NORMAL,
                     System.currentTimeMillis()
             );

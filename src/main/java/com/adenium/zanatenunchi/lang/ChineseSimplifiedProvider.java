@@ -92,5 +92,34 @@ public class ChineseSimplifiedProvider implements IBotLanguageProvider {
         if (className.equals("Creeper")) return String.format("事件: %s 在 Creeper 爆炸前将其击杀。", playerName);
         return String.format("事件: %s 击杀了 %s。随意评论。", playerName, mobName);
     }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("警报：在 %s 附近有 %s。距离：约 %d 格。生命：%d 心。", playerName, mobList, distance, hearts);
+        return isCritical ? base + " 这是紧急情况，立刻反应！" : base + " 给出快速建议。";
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("发现：%s 在 Y=%d 发现了 %s。对此做出反应。", playerName, yLevel, oreName);
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch (timeKey) {
+            case "sunrise" -> "太阳刚刚升起";
+            case "morning" -> "现在是早上";
+            case "noon" -> "现在是中午";
+            case "afternoon" -> "现在是下午";
+            case "night" -> "夜晚已经降临";
+            default -> "现在是深夜";
+        };
+        return String.format("情境: %s 在 %s，%s，生物群系: %s。生命: %d，饥饿: %d/20。对这种情况说些自发且自然的话。", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getLowFoodEvent(String playerName) {
+        return String.format("事件: %s 快要饿死了！提醒他吃东西。", playerName);
+    }
 }
 

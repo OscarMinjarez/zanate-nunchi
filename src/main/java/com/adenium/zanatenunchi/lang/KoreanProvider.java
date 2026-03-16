@@ -92,5 +92,32 @@ public class KoreanProvider implements IBotLanguageProvider {
         if (className.equals("Creeper")) return String.format("이벤트: %s가 Creeper를 폭발 전에 처치했습니다.", playerName);
         return String.format("이벤트: %s가 %s를 처치했습니다. 간단한 코멘트.", playerName, mobName);
     }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("경보: %s 근처에 %s 가 있습니다. 거리: 약 %d 블록. 체력: %d 하트.", playerName, mobList, distance, hearts);
+        return isCritical ? base + " 긴급 상황입니다. 즉시 반응하세요!" : base + " 빠른 조언을 해주세요.";
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("발견: %s 가 Y=%d 에서 %s 를 발견했습니다. 이 발견에 반응하세요.", playerName, yLevel, oreName);
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch (timeKey) {
+            case "sunrise" -> "해가 막 떠올랐습니다";
+            case "morning" -> "아침입니다";
+            case "noon" -> "정오입니다";
+            case "afternoon" -> "오후입니다";
+            case "night" -> "밤이 되었습니다";
+            default -> "한밤중입니다";
+        };
+        return String.format("상황: %s 는 %s, %s, 바이옴: %s 에 있습니다. 체력: %d, 배고픔: %d/20. 자연스럽고 즉흥적인 한마디를 해주세요.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getLowFoodEvent(String playerName) { return String.format("이벤트: %s 이(가) 배고픕니다! 먹으라고 알려주세요.", playerName); }
 }
 

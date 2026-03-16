@@ -92,5 +92,32 @@ public class RussianProvider implements IBotLanguageProvider {
         if (className.equals("Creeper")) return String.format("Событие: %s убил Creeper до взрыва.", playerName);
         return String.format("Событие: %s убил %s. Небольшой комментарий.", playerName, mobName);
     }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("Оповещение: Рядом с %s есть %s. Расстояние: ~%d блоков. Здоровье: %d сердец.", playerName, mobList, distance, hearts);
+        return isCritical ? base + " Это чрезвычайная ситуация, реагируй немедленно!" : base + " Дай им быстрый совет.";
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("Открытие: %s нашёл %s на Y=%d. Отреагируй на это открытие.", playerName, oreName, yLevel);
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch (timeKey) {
+            case "sunrise" -> "солнце только что взошло";
+            case "morning" -> "утро";
+            case "noon" -> "полдень";
+            case "afternoon" -> "день подходит к концу";
+            case "night" -> "настала ночь";
+            default -> "полночь";
+        };
+        return String.format("Контекст: %s находится в %s, %s, биом: %s. Здоровье: %d, голод: %d/20. Скажи что-то спонтанное и естественное.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getLowFoodEvent(String playerName) { return String.format("Событие: %s испытывает голод! Скажи ему, чтобы поел.", playerName); }
 }
 

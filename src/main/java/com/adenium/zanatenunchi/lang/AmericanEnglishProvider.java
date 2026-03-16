@@ -114,4 +114,33 @@ public class AmericanEnglishProvider implements IBotLanguageProvider {
             }
         }
     }
+
+    @Override
+    public String getLowFoodEvent(String playerName) {
+        return String.format("Event: %s is starving! React by telling them to eat something.", playerName);
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("Discovery: %s found %s at Y=%d. React to this discovery.", playerName, oreName, yLevel);
+    }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("Alert: There are %s near %s. Distance: ~%d blocks. Health: %d hearts.", mobList, playerName, distance, hearts);
+        return isCritical ? base + " This is an emergency, react immediately!" : base + " Give them some quick advice.";
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch(timeKey) {
+            case "sunrise" -> "the sun just came up";
+            case "morning" -> "it's morning";
+            case "noon" -> "it's noon";
+            case "afternoon" -> "it's getting late";
+            case "night" -> "night just fell";
+            default -> "it's midnight";
+        };
+        return String.format("Context: %s is in %s, %s, biome: %s. Health: %d, food: %d/20. Say something spontaneous and natural about this situation.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
 }

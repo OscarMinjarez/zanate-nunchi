@@ -92,5 +92,34 @@ public class JapaneseProvider implements IBotLanguageProvider {
         if (className.equals("Creeper")) return String.format("イベント: %s は Creeper を爆発前に倒しました。", playerName);
         return String.format("イベント: %s は %s を倒しました。ちょっとしたコメントを。", playerName, mobName);
     }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("警報: %s の近くに %s がいます。距離: 約 %d ブロック。体力: %d ハート。", playerName, mobList, distance, hearts);
+        return isCritical ? base + " 緊急事態です、すぐに反応してください！" : base + " 迅速なアドバイスを与えてください。";
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("発見: %s が Y=%d で %s を見つけました。この発見に反応してください。", playerName, yLevel, oreName);
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch (timeKey) {
+            case "sunrise" -> "太陽がちょうど昇った";
+            case "morning" -> "朝です";
+            case "noon" -> "正午です";
+            case "afternoon" -> "午後です";
+            case "night" -> "夜になりました";
+            default -> "真夜中です";
+        };
+        return String.format("状況: %s は %s、%s、バイオーム: %s にいます。体力: %d、空腹: %d/20。自然な自発的な一言を言ってください。", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getLowFoodEvent(String playerName) {
+        return String.format("イベント: %s は空腹です！何か食べるように言ってください。", playerName);
+    }
 }
 

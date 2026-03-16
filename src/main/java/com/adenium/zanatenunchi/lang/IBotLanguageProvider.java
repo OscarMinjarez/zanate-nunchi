@@ -20,7 +20,13 @@ public interface IBotLanguageProvider {
 
     // Eventos del Mundo y Entorno (Existentes + Nuevos)
     String getBiomeChangeEvent(String playerName, String biomeName);
-    String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension); // NUEVO
-    String getWeatherEvent(String weatherType, boolean isStarting); // NUEVO
-    String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles); // NUEVO
+    String getDimensionChangeEvent(String playerName, String dimensionName, String previousDimension);
+    String getWeatherEvent(String weatherType, boolean isStarting);
+    String getTimeEvent(String timeOfDay, String playerName, int hearts, int food, int nearbyHostiles);
+
+    // Eventos de Estado del Jugador
+    String getLowFoodEvent(String playerName);
+    String getOreFoundEvent(String playerName, String oreName, int yLevel);
+    String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical);
+    String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food);
 }

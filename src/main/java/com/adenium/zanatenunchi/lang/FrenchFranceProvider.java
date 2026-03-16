@@ -94,5 +94,34 @@ public class FrenchFranceProvider implements IBotLanguageProvider {
         if (className.equals("Creeper")) return String.format("Événement: %s a tué un Creeper avant qu'il n'explose.", playerName);
         return String.format("Événement: %s a tué un %s. Commentaire casual.", playerName, mobName);
     }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("Alerte : Il y a %s près de %s. Distance : ~%d blocs. Vie : %d coeurs.", mobList, playerName, distance, hearts);
+        return isCritical ? base + " C'est une urgence, réagis immédiatement !" : base + " Donne-lui un conseil rapide.";
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("Découverte: %s a trouvé %s à Y=%d. Réagis à cette découverte.", playerName, oreName, yLevel);
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch (timeKey) {
+            case "sunrise" -> "le soleil vient de se lever";
+            case "morning" -> "c'est le matin";
+            case "noon" -> "c'est midi";
+            case "afternoon" -> "il commence à se faire tard";
+            case "night" -> "la nuit est tombée";
+            default -> "il est minuit";
+        };
+        return String.format("Contexte: %s est dans %s, %s, biome: %s. Vie: %d, faim: %d/20. Dis quelque chose de spontané et naturel.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getLowFoodEvent(String playerName) {
+        return String.format("Événement: %s est en mauvaise posture de faim ! Dis-lui de manger quelque chose.", playerName);
+    }
 }
 

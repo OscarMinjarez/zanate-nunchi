@@ -112,5 +112,32 @@ public class SpanishSpainProvider implements IBotLanguageProvider {
             return String.format("Evento: %s mató a un %s. Comentario casual.", playerName, mobName);
         }
     }
+
+    @Override
+    public String getDangerAlertEvent(String playerName, String mobList, int hearts, int distance, boolean isCritical) {
+        String base = String.format("Alerta: Hay %s cerca de %s. Distancia: ~%d bloques. Vida: %d corazones.", mobList, playerName, distance, hearts);
+        return isCritical ? base + " ¡Es una emergencia, reacciona inmediatamente!" : base + " Dale un consejo rápido.";
+    }
+
+    @Override
+    public String getOreFoundEvent(String playerName, String oreName, int yLevel) {
+        return String.format("Descubrimiento: %s encontró %s en Y=%d. Reacciona a este descubrimiento.", playerName, oreName, yLevel);
+    }
+
+    @Override
+    public String getSpontaneousEvent(String playerName, String dimension, String timeKey, String biome, int hearts, int food) {
+        String timeDesc = switch (timeKey) {
+            case "sunrise" -> "acaba de amanecer";
+            case "morning" -> "es de mañana";
+            case "noon" -> "es mediodía";
+            case "afternoon" -> "está atardeciendo";
+            case "night" -> "anocheció";
+            default -> "es medianoche";
+        };
+        return String.format("Contexto: %s está en %s, %s, bioma: %s. Vida: %d, hambre: %d/20. Di algo espontáneo y natural sobre esta situación.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getLowFoodEvent(String playerName) { return String.format("Evento: %s está con poca comida! Dile que coma algo.", playerName); }
 }
 
