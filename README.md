@@ -1,107 +1,78 @@
-# 🤖 Ollama Bot - Minecraft AI Companion
+# 🤖 Zanate Nunchi - Tu Compañero IA en Minecraft (Ollama Local LLM)
 
-Un mod de Fabric para Minecraft 1.21.6 que añade un compañero IA por jugador, impulsado por Ollama (LLM local).
+Un mod revolucionario para **Minecraft Fabric 1.21.6** que introduce a un compañero de aventuras impulsado por **Inteligencia Artificial Local (Ollama)**. No es un asistente aburrido ni un menú de ayuda: es un *jugador más* que reacciona a tu mundo, entiende tu idioma, tiene su propia personalidad y narra tu partida en tiempo real.
 
 ![Minecraft Version](https://img.shields.io/badge/Minecraft-1.21.6-green)
 ![Fabric Loader](https://img.shields.io/badge/Fabric%20Loader-0.18.2-blue)
+![Ollama](https://img.shields.io/badge/AI-Ollama%20(Local)-orange)
 ![License](https://img.shields.io/badge/License-CC0-lightgrey)
 
-## ✨ Resumen de la versión reciente
+---
 
-Esta versión introduce varias mejoras importantes:
+## ✨ Características Destacadas
 
-- Proveedores específicos por idioma (clases que implementan `IBotLanguageProvider`) en lugar de un proveedor genérico. Esto permite respuestas más naturales y adaptadas a cada dialecto.
-- Sistema de localización pensado para integrar archivos JSON de traducción en `resources` (ruta propuesta: `assets/zanatenunchi/lang/{code}.json`).
-- Detección de idioma por jugador (`LanguageObserver`) con fallback configurable.
-- Corrección de NullPointerException en `PromptManager` y mejoras de robustez en la generación de prompts.
-- Mejora del control de spam: cooldowns por tipo de evento, rotación de frases y reglas de prioridad (HIGH/NORMAL/LOW).
+### 🎭 Personalidad Única y Orgánica
+Zanate Nunchi no es un "bot" genérico. **Cada jugador que se conecta recibe un compañero con una personalidad generada proceduralmente**:
+- **Nombre propio** (ej. "Diego", "Sofía", "Max").
+- **Edad y Género**.
+- **Rasgos de personalidad** (ej. *sarcástico*, *tímido*, *alegre*, *valiente*).
+- **Estilo de habla** (ej. *directo*, *poético*, *informal*).
+Esta personalidad altera **todas** sus respuestas. Si tu bot es sarcástico, se burlará de ti cuando recibas daño; si es protector, entrará en pánico.
 
-Si estás actualizando desde una versión anterior, revisa la sección "Migración" más abajo.
+### 🧠 Arquitectura de Pizarra (Blackboard) y Contexto Espacial
+El bot no solo responde cuando le hablas. Observa constantemente tu partida de forma silenciosa e inteligente:
+- **Combate**: Detecta cuándo mueres, qué mob te mata, o si estás haciendo una masacre (multiplicadores de kills).
+- **Supervivencia**: Sabe si tienes hambre (menos de 8 muslos) o si tu salud es crítica (menos de 4 corazones).
+- **Entorno**: Reacciona a transiciones de día/noche, cambios de bioma, lluvia, tormentas y viajes entre dimensiones (Nether/End).
+- **Alerta Temprana**: Calcula la distancia entre tú y los mobs hostiles cercanos, advirtiéndote si te están flanqueando.
+- **Logros**: Celebra (o critica) cuando desbloqueas advancements.
 
-## ✨ Características principales
+### 🌐 Dialectos Regionales Estrictos (Anti-Drift)
+El mod detecta automáticamente el idioma de tu cliente de Minecraft y obliga al Modelo de Lenguaje (LLM) a hablar en tu **dialecto regional exacto**, prohibiendo el cruce de modismos:
+- 🇲🇽 **Español (México)**: El bot usará "wey", "neta", "chido". Tiene prohibido usar modismos argentinos o españoles.
+- 🇪🇸 **Español (España)**: Usará "tío", "mola", "chaval".
+- 🇦🇷 **Español (Argentina)**: Usará "vos", "che", "boludo".
+- 🇬🇧 **English (UK)** vs 🇺🇸 **English (US)** vs 🇦🇺 **English (AU)**: Distingue perfectamente entre "mate", "dude" y "cobber".
+- *Soporta 13 idiomas y 17 variantes regionales en total.*
 
-### 🎭 Personalidad única por jugador
-- Cada jugador obtiene su propio compañero bot con nombre, personalidad y estilo de hablar únicos.
-- La personalidad se genera automáticamente cuando el jugador se conecta por primera vez y se persiste por mundo.
+### ⚡ Motor de LLM Local Optimizado para Gaming
+El mod se comunica con un servidor local de **Ollama** (recomendado `llama3.2`), lo que significa **cero latencia de red, cero costos de API y total privacidad a tus datos**.
+- **Guardrails de Tokens:** El mod ajusta dinámicamente cuántos tokens (palabras) puede generar la IA. 
+  - *Situación normal:* Frases conversacionales cortas.
+  - *Peligro Inmediato:* La IA entra en modo pánico, generando respuestas ultracortas de latencia casi cero.
+- **Control de Spam y Cooldowns:** Un sistema matemático evita que el bot hable sin parar. Si estás minando, hará un comentario ocasional; si estás peleando, solo gritará si tu salud baja de un umbral crítico.
+- **Anti-Corte de Oraciones:** Si la IA excede el límite de tokens, el mod recorta la frase limpia hasta el último signo de puntuación válido para evitar frases a medias.
 
-### 🌐 Soporte multilenguaje (implementado)
+---
 
-Proveedores de idioma ya implementados (clases Java en `com.adenium.zanatenunchi.lang`):
+## 🚀 Instalación y Uso
 
-- es_mx (MexicanSpanishProvider)
-- es_es (SpanishSpainProvider)
-- es_ar, es_cl, es_co, es_ve (mapeados a SpanishSpainProvider o variantes según sea necesario)
-- en_us, en_gb, en_au (AmericanEnglishProvider usado como base para variantes)
-- pt_br, pt_pt (PortugueseBrazilProvider)
-- fr_fr, fr_ca (FrenchFranceProvider)
-- de_de (GermanProvider)
-- it_it (ItalianProvider)
-- ja_jp (JapaneseProvider)
-- ko_kr (KoreanProvider)
-- zh_cn, zh_tw (ChineseSimplifiedProvider usado para ambas variantes)
-- ru_ru (RussianProvider)
-- pl_pl (PolishProvider)
+### Requisitos Previos
+1. **Minecraft 1.21.6** con **Fabric Loader 0.18.2+** y **Fabric API 0.128.2+**.
+2. **Java 21**.
+3. **Ollama instalado en tu PC** (o en tu red local).
 
-Diseño de localización:
-- Archivos JSON por idioma en recursos: `assets/zanatenunchi/lang/{code}.json` (por ejemplo `en_us.json`, `es_mx.json`).
-- Un `TranslationManager` (planificado/implementable) hará carga lazy, caché thread-safe y fallback a `en_us` cuando falten claves.
-- Los `IBotLanguageProvider` actuales contienen plantillas y eventos; se irá migrando la lógica de strings a los JSONs para facilitar ediciones.
+### Configurando la IA (Ollama)
+1. Descarga e instala Ollama desde [ollama.com](https://ollama.com).
+2. Abre tu terminal y descarga el modelo rápido recomendado:
+   ```bash
+   ollama pull llama3.2
+   ```
+3. Asegúrate de que Ollama esté corriendo:
+   ```bash
+   ollama serve
+   ```
 
-### 👁️ Observadores del juego
-El bot reacciona a eventos en tiempo real mediante observers:
+### Iniciando el Mod
+Coloca el archivo `.jar` del mod en tu carpeta `mods/`. Al iniciar un mundo, la configuración se generará en `config/ollama_bot.json`.
+Si juegas en multijugador, ¡cada jugador en el servidor de Fabric tendrá su propia IA privada susurrándole al oído!
 
-- `CombatObserver`: muertes, daño fuerte, kills de mobs
-- `WorldObserver`: cambios de bioma, clima, dimensión y hora del día
-- `PlayerStatusObserver`: salud baja, hambre, peligro cercano y hallazgos
-- `ChatObserver`: registro de conversaciones
-- `LanguageObserver`: detección del idioma por cliente (por jugador)
+---
 
-### 🧠 Blackboard (arquitectura)
-- Cola de eventos priorizada
-- Cooldowns por tipo de evento para evitar spam
-- Historial de conversación por jugador (persistente por mundo)
+## ⚙️ Configuración (`ollama_bot.json`)
 
-## 📦 Requisitos
+El mod es altamente personalizable desde su archivo de configuración JSON:
 
-- Minecraft: 1.21.6
-- Fabric Loader: 0.18.2+
-- Fabric API: 0.128.2+
-- Java: 21
-- Ollama: instalado y en ejecución localmente
-- Modelo LLM: `llama3.2` (u otro compatible configurado)
-
-## 🚀 Instalación rápida
-
-### 1) Instalar Ollama (ejemplo Windows PowerShell)
-```powershell
-winget install Ollama.Ollama
-```
-
-En macOS / Linux usa tu gestor de paquetes preferido o el script de instalación de Ollama.
-
-### 2) Descargar un modelo
-```powershell
-ollama pull llama3.2
-```
-
-### 3) Iniciar Ollama
-```powershell
-ollama serve
-```
-
-### 4) Compilar el mod y probar localmente
-```powershell
-.\gradlew.bat clean build
-.\gradlew.bat runClient
-```
-
-Coloca el `.jar` resultante en la carpeta `mods/` para ejecutar en un cliente/servidor Fabric.
-
-## ⚙️ Configuración (resumen)
-
-El archivo de configuración principal es `ollama_bot.json` (ubicación típica: `run/config/ollama_bot.json` durante desarrollo, o `.minecraft/config/ollama_bot.json` en instalación normal).
-
-Ejemplo mínimo:
 ```json
 {
   "ollama": {
@@ -113,102 +84,64 @@ Ejemplo mínimo:
     "highEventSeconds": 8,
     "spontaneousSeconds": 120
   },
+  "history": {
+    "maxMessages": 20
+  },
   "language": "es"
 }
 ```
 
-Opciones importantes:
-
-- `ollama.url`: URL del servidor Ollama (por defecto `http://localhost:11434`).
-- `ollama.model`: modelo a usar.
-- `cooldowns.*`: control de spam/intervalos.
-- `history.maxMessages`: máximo de mensajes mantenidos en memoria por jugador.
-- `language`: valor por defecto global; cada jugador tiene su idioma detectado por `LanguageObserver` y puede sobreescribirse.
-
-## 🛠️ Cómo añadir / mejorar un idioma
-
-1. Añade un provider específico en `src/main/java/com/adenium/zanatenunchi/lang/` implementando `IBotLanguageProvider` si necesitas lógica personalizada.
-2. Añade/edita el archivo de traducción en `src/main/resources/assets/zanatenunchi/lang/{code}.json` con las claves necesarias (ej.: `system_prompt`, `greeting_new_player`, `event_low_health`, ...).
-3. Registra el provider en `LanguageManager` si es un provider Java; si solo usas JSON/TranslationManager, asegúrate de que el código de idioma existe en los archivos.
-
-Consejo: para traducciones rápidas puedes usar traducción automática como base, luego revisarlas manualmente.
-
-## 📁 Estructura del proyecto (actualizada)
-
-```text
-src/main/java/com/adenium/zanatenunchi/
-├── ai/
-│   ├── OllamaClient.java
-│   ├── PromptManager.java         # Genera prompts usando IBotLanguageProvider / TranslationManager
-├── blackboard/
-│   └── Blackboard.java
-├── config/
-│   └── ModConfig.java
-├── controller/
-│   └── BotController.java
-├── observers/
-│   ├── ChatObserver.java
-│   ├── CombatObserver.java
-│   ├── LanguageObserver.java     # Detecta locale por jugador
-│   ├── PlayerStatusObserver.java
-│   └── WorldObserver.java
-├── lang/
-│   ├── IBotLanguageProvider.java
-│   ├── AmericanEnglishProvider.java
-│   ├── MexicanSpanishProvider.java
-│   ├── SpanishSpainProvider.java
-│   ├── PortugueseBrazilProvider.java
-│   ├── FrenchFranceProvider.java
-│   ├── GermanProvider.java
-│   ├── ItalianProvider.java
-│   ├── JapaneseProvider.java
-│   ├── KoreanProvider.java
-│   ├── ChineseSimplifiedProvider.java
-│   ├── RussianProvider.java
-│   └── PolishProvider.java
-└── util/
-    └── LanguageManager.java      # Mapea códigos a providers y perfiles
-
-src/main/resources/
-└── assets/zanatenunchi/lang/      # <-- aquí van los JSON de traducción ({code}.json)
-```
-
-## 📋 Eventos detectados (resumen)
-
-Los eventos y su clasificación por impacto se mantienen (HIGH / NORMAL / LOW). La lógica de prioridad y cooldown evita spam y prioriza mensajes críticos.
-
-## 🧪 Tests y CI
-
-El proyecto tiene tests básicos (si existen) y se pueden ejecutar con:
-
-```powershell
-.\gradlew.bat test
-```
-
-Si integras CI, añade pasos para compilar y ejecutar pruebas, y opcionalmente ejecutar análisis estático (SpotBugs / Checkstyle).
-
-## Migración desde versiones anteriores
-
-- Si venías usando `GenericLanguageProvider`, ahora los proveedores son específicos y deben registrarse en `LanguageManager`.
-- Si almacenabas cadenas en código, considera moverlas a `assets/zanatenunchi/lang/{code}.json` para facilitar mantenimiento.
-
-## 🤝 Contribuir
-
-1. Haz un fork del repositorio
-2. Crea una rama (`git checkout -b feature/nueva-caracteristica`)
-3. Haz commit de tus cambios (`git commit -am 'Añade nueva característica'`)
-4. Haz push a la rama (`git push origin feature/nueva-caracteristica`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Este proyecto está disponible bajo la licencia CC0. Siéntete libre de aprender de él e incorporarlo en tus propios proyectos.
-
-## 🙏 Créditos
-
-- Fabric - Mod loader (https://fabricmc.net/)
-- Ollama - LLM local (https://ollama.ai/)
+- **url / model:** Ajusta esto si corres Ollama en otra PC de tu red o si quieres usar un modelo más pesado (ej. `llama3:8b`).
+- **cooldowns:** Controla qué tan "callado" es tu bot. Aumenta los segundos si te resulta molesto.
+- **maxMessages:** Cuántos mensajes recuerda la IA antes de olvidarlos (memoria a corto plazo).
 
 ---
 
-**¿Problemas?** Asegúrate de que Ollama esté ejecutándose con `ollama serve` y que el modelo esté descargado con `ollama pull llama3.2`.
+## 📁 Estructura para Desarrolladores
+
+El mod está diseñado con un modelo arquitectónico robusto basado en **Observers** y una **Pizarra Compartida (Blackboard)**.
+
+```text
+com/adenium/zanatenunchi/
+├── ai/
+│   ├── OllamaClient.java         # Comunicación HTTP asíncrona con Ollama AI. Parametriza tokens según peligro.
+│   ├── PersonalityGenerator.java # Forja personalidades únicas persistentes en JSON.
+│   └── PromptManager.java        # Ingenieria de Prompts maestra: inyecta personalidad y reglas dialectales estrictas.
+├── blackboard/
+│   ├── Blackboard.java           # Almacenamiento en memoria de estados, cooldowns y memoria de los jugadores.
+│   └── BotEvent.java             # Clasificación de eventos (LOW, NORMAL, HIGH).
+├── controller/
+│   └── BotController.java        # Cerebro central. Decide qué eventos leer, aplica guardrails anti-corte y delega a IA.
+├── lang/
+│   └── ...Provider.java          # Cadenas hardcodeadas estructuradas y deterministicas para velocidades Ultrabajas.
+├── observers/
+│   ├── ChatObserver.java         # Lee el chat y extrae nombres.
+│   ├── CombatObserver.java       # Manejo de Health y entidades de daño de Minecraft.
+│   ├── LanguageObserver.java     # Lee Options del cliente de MC para setear provider.
+│   ├── PlayerStatusObserver.java # Inventario, TickEvents, Hambre.
+│   └── WorldObserver.java        # BiomeKeys, DimensionKeys, Weather.
+└── util/
+    └── LanguageManager.java      # Mapeos dialectales estrictos (anti-drift).
+```
+
+## 🛠️ Compilación desde el Código Fuente
+1. Clona el repositorio.
+2. Compila el `.jar`:
+   ```bash
+   ./gradlew build
+   ```
+3. Ejecuta el cliente en el entorno de desarrollo de Fabric:
+   ```bash
+   ./gradlew runClient
+   ```
+
+---
+
+## 🤝 Contribuciones
+¡Los PRs para añadir más dialectos, mejores triggers en los observers o interacciones de IA (como hacer que el bot sugiera crafteos) son totalmente bienvenidos!
+
+## 📄 Licencia
+Distribuido bajo la Licencia **CC0**. Libre para la comunidad.
+
+---
+*Desarrollado con ❤️ para llevar una experiencia Next-Gen RPG a Minecraft Clásico.*
