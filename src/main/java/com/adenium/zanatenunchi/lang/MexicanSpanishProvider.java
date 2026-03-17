@@ -24,12 +24,17 @@ public class MexicanSpanishProvider implements IBotLanguageProvider {
 
     @Override
     public String getShortInstruction() {
-        return "Responde con una sola frase muy corta y natural. Solo en español.";
+        return "Reacciona breve (4-10 palabras), en una oración. Solo en español mexicano.";
     }
 
     @Override
     public String getNormalInstruction() {
-        return "Responde de forma casual. Solo en español.";
+        return "Reacciona en 1 o 2 oraciones (10-28 palabras). Puedes hacer una pregunta corta si ayuda al jugador. Habla en segunda persona y usa solo hechos presentes en el evento; no agregues contexto externo. Solo en español mexicano.";
+    }
+
+    @Override
+    public String getEmotiveInstruction() {
+        return "Reacciona con energía y urgencia cuando aplique, en 1 o 2 oraciones (8-32 palabras), manteniendo coherencia con los hechos del evento. Solo en español mexicano.";
     }
 
     @Override
@@ -150,9 +155,49 @@ public class MexicanSpanishProvider implements IBotLanguageProvider {
     public String getFallbackReply(BotEvent.Impact impact, String playerName) {
         String p = playerName + ", ";
         return switch (impact) {
-            case LOW -> p + "todo en orden, pero no te me fíes.";
-            case NORMAL -> p + "ojo con el entorno, mantén la calma.";
-            case HIGH -> p + "¡Cuidado! Muévete ya.";
+            case LOW -> p + "todo calmado por aquí, wey.";
+            case NORMAL -> p + "ojo con el entorno, no te confíes.";
+            case HIGH -> p + "¡Aguas! ¡Muévete ya, órale!";
+        };
+    }
+
+    @Override
+    public String[] getPersonalityTraits() {
+        return new String[]{
+            "extrovertida, le encanta conocer gente nueva",
+            "introvertida pero muy leal con sus cuates",
+            "amigable con todos, nunca juzga",
+            "líder natural, le gusta organizar al grupo",
+            "sarcástica nivel experto, pero nunca hiriente",
+            "bromista compulsiva, todo lo convierte en chiste",
+            "hiperactiva, siempre quiere hacer algo",
+            "bien chill, va con calma por la vida",
+            "resuelve todo con lógica fría",
+            "dramática para las pequeñeces, tranquila en crisis reales",
+            "muy expresiva, se le nota todo en la cara",
+            "poker face profesional, nadie sabe qué piensa",
+            "competitiva feroz, odia perder",
+            "juega por diversión, le da igual ganar",
+            "obsesionada con la estética y decoración",
+            "caótica, su inventario es un desmadre"
+        };
+    }
+
+    @Override
+    public String[] getSpeakingStyles() {
+        return new String[]{
+            "mensajes súper cortos, a veces solo emojis o una palabra",
+            "equilibrada, ni muy larga ni muy corta",
+            "casual total, como si hablara con su mejor cuate",
+            "usa muletillas como 'o sea', 'literal', 'tipo', 'güey'",
+            "cero mayúsculas, todo en minúscula",
+            "MAYÚSCULAS cuando se emociona",
+            "usa emojis con moderación pero bien puestos",
+            "reacciona con 'jajaja', 'xd', 'no manches' con frecuencia",
+            "hace muchas preguntas de vuelta",
+            "respuestas directas sin rodeos",
+            "puntos suspensivos... en todo...",
+            "signos de exclamación abundantes!!!"
         };
     }
 

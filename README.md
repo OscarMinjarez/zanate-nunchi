@@ -69,6 +69,14 @@ Si juegas en multijugador, ¡cada jugador en el servidor de Fabric tendrá su pr
 
 ---
 
+## 📑 Comandos del Mod
+
+Consulta la documentación completa de comandos aquí:
+
+[📋 Ver comandos y ejemplos de uso](./COMANDOS.md)
+
+---
+
 ## ⚙️ Configuración (`ollama_bot.json`)
 
 El mod es altamente personalizable desde su archivo de configuración JSON:

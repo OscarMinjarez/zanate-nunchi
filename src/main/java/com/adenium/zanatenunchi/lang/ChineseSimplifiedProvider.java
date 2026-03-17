@@ -12,18 +12,30 @@ public class ChineseSimplifiedProvider implements IBotLanguageProvider {
                         "性别: %s\n" +
                         "年龄: %s\n" +
                         "特征: %s\n" +
-                        "说话风格: %s\n" +
+                        "说话风格: 自然中文, %s\n" +
                         "当前情绪: %s\n\n" +
-                        "规则: 使用中文自然回复。",
+                        "严格规则:\n" +
+                        "1. 你不是 AI，你是游戏世界中的一名玩家。\n" +
+                        "2. 务必使用中文回答。\n" +
+                        "3. 保持对话形式并对上下文做出反应。",
                 botName, gender, age, traits, style, emotionalBias
         );
     }
 
     @Override
-    public String getShortInstruction() { return "用一句非常简短且自然的话回复。"; }
+    public String getShortInstruction() {
+        return "简短地（一句话，约 10-20 字）做出反应。仅限中文。";
+    }
 
     @Override
-    public String getNormalInstruction() { return "以随意的方式回复。"; }
+    public String getNormalInstruction() {
+        return "用 1 到 2 句话（约 20-60 字）做出反应。如果对玩家有帮助，可以问一个简短的问题。以第二人称交谈，仅使用事件中的事实；不要添加外部上下文。仅限中文。";
+    }
+
+    @Override
+    public String getEmotiveInstruction() {
+        return "根据需要带上能量和紧迫感，用 1 到 2 句话（约 20-70 字）做出反应。保持与事件事实的一致性。仅限中文。";
+    }
 
     @Override
     public String getDeathEvent(String cause, String attackerName, String playerName) {
@@ -125,13 +137,67 @@ public class ChineseSimplifiedProvider implements IBotLanguageProvider {
     }
 
     @Override
-    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s 回退] %s: 目前没有足够的上下文来完整回复。简短即可。", impact != null ? impact.name() : "NONE", playerName); }
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) {
+        String p = playerName + "，";
+        return switch (impact) {
+            case LOW -> p + "这边没事，别担心。";
+            case NORMAL -> p + "注意一下周围。";
+            case HIGH -> p + "小心！现在就动！";
+        };
+    }
 
     @Override
-    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("紧急危险: %s 靠近 %s(约 %d 格)。%s 剩余 %d 心 — 立即警告并撤离。", mobs, playerName, distance, playerName, hearts); }
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) {
+        return String.format("紧急危险: %s 在 %s 附近（~%d格）。%s 剩 %d 心——马上跑！", mobs, playerName, distance, playerName, hearts);
+    }
 
     @Override
-    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "来自聊天" : "来自系统"; return String.format("超时 (%s): %s，未能及时处理。简短回复。", src, playerName); }
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+        String p = playerName + "，";
+        if (fromChat) return p + "等我一下，这里超乱。";
+        return (impact == BotEvent.Impact.HIGH) ? p + "小心！赶紧反应！" : p + "我还在，别担心。";
+    }
+
+    @Override
+    public String[] getPersonalityTraits() {
+        return new String[]{
+            "外向，超喜欢认识新朋友",
+            "内向但对亲密朋友非常忠诚",
+            "对谁都友善，从不评判别人",
+            "天生领导者，喜欢组织团队",
+            "讽刺的专家，但绝对不伤人",
+            "强迫性的段子手，把一切变成梗",
+            "超活跃，永远想做点什么",
+            "超平和，顺其自然地生活",
+            "用冷静的逻辑解决一切",
+            "小事大惊小怪，真正危机时却非常冷静",
+            "表情丰富，什么情绪都写在脸上",
+            "巨型扑克脸，没人知道在想什么",
+            "超级不服输，怎么都要赢",
+            "纯粹为了开心来玩，输赢无所谓",
+            "对建筑和美学有过人的执着",
+            "一团混乱，背包永远是灾难现场"
+        };
+    }
+
+    @Override
+    public String[] getSpeakingStyles() {
+        return new String[]{
+            "超短的消息，有时只写一个字",
+            "定了个概不长不短的平衡",
+            "全程随途，像跟好哈肥子聊天",
+            "经常用'就是''真的''也就是说'路签",
+            "全用小写，不用大写",
+            "兴奋时全用大写！",
+            "表情包用得少但用得奋",
+            "经常用'哈哈''抓狂''怕了'回应",
+            "每次都会反问",
+            "直接答复，不绕弯",
+            "省略号…绕绕用…",
+            "感叹号用个不停!!!"
+        };
+    }
+
 
     @Override
     public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {

@@ -4,6 +4,8 @@ import com.adenium.zanatenunchi.blackboard.Blackboard;
 import com.adenium.zanatenunchi.blackboard.BotEvent;
 import com.adenium.zanatenunchi.blackboard.BotEvent.Impact;
 import com.adenium.zanatenunchi.data.DataManager;
+import com.adenium.zanatenunchi.lang.IBotLanguageProvider;
+import com.adenium.zanatenunchi.util.LanguageManager;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -129,6 +131,26 @@ public class PersonalityGenerator {
         "divaga un poco antes de llegar al punto"
     };
 
+    private static final String[] EN_PERSONALITY_TRAITS = {
+            "extroverted, loves meeting new people", "introverted but loyal to close friends",
+            "friendly to everyone, never judges", "natural leader, likes to organize the group",
+            "expert level sarcastic, but never hurtful", "compulsive joker",
+            "hyperactive, always wants to do something", "chill, takes life easy",
+            "resolves everything with cold logic", "dramatic for small things, calm in real crises",
+            "highly expressive", "poker face professional",
+            "fiercely competitive, hates losing", "plays for fun, doesn't care about winning",
+            "obsessed with aesthetics and building", "chaotic, inventory is a mess"
+    };
+
+    private static final String[] EN_SPEAKING_STYLES = {
+            "super short messages, sometimes just one word", "balanced, not too long or short",
+            "total casual, like talking to a best friend", "varies between professional and meme lord",
+            "uses a lot of filler words like 'like', 'literally'", "clean speech, no filler words",
+            "all lowercase, no caps", "ALL CAPS when excited",
+            "uses emojis sparingly but well placed", "reacts with 'lol', 'lmao' frequently",
+            "asks a lot of questions back", "direct answers without beating around the bush"
+    };
+
     private final Blackboard blackboard;
     private final OllamaClient ollamaClient;
     private final DataManager dataManager;
@@ -164,7 +186,6 @@ public class PersonalityGenerator {
     }
 
     private void generatePlayerPersonality(String uuid, String playerLanguage) {
-        // Si ya tiene personalidad, no generar nueva
         if (blackboard.hasPlayerPersonality(uuid)) {
             blackboard.removePendingPersonality(uuid);
             publishGreetingForPlayer(uuid);
@@ -174,8 +195,8 @@ public class PersonalityGenerator {
         LOGGER.info("Generando personalidad única para jugador {}...", uuid);
 
         try {
-            // Usar el idioma del jugador para el prompt
             String languageHint = getLanguageHint(playerLanguage);
+            String targetLanguage = getLanguageNameForPrompt(playerLanguage);
 
             String prompt = """
                 Crea una personalidad ÚNICA para un compañero gamer de Minecraft.
@@ -193,10 +214,11 @@ public class PersonalityGenerator {
                 REGLAS PARA PERSONALIDAD:
                 - Los rasgos deben ser realistas
                 - El estilo de hablar debe ser casual, como joven en Discord
+                - IMPORTANTE: ESCRIBE LOS CAMPOS 'traits' Y 'speakingStyle' EN EL IDIOMA: %s
                 
                 Responde SOLO con este JSON:
                 {"name": "NombreReal", "gender": "male o female", "age": "número", "traits": "3 rasgos", "speakingStyle": "estilo breve"}
-                """.formatted(languageHint);
+                """.formatted(languageHint, targetLanguage);
 
             String personalityStr = ollamaClient.callOllamaForPersonality(prompt);
             JsonObject p = tryParseAndValidate(personalityStr);
@@ -204,8 +226,7 @@ public class PersonalityGenerator {
             if (p != null) {
                 blackboard.setPlayerPersonality(uuid, p);
                 dataManager.saveData();
-                LOGGER.info("Personalidad por jugador creada: {} para UUID {}",
-                        p.get("name").getAsString(), uuid);
+                LOGGER.info("Personalidad por jugador creada: {} para UUID {}", p.get("name").getAsString(), uuid);
                 blackboard.removePendingPersonality(uuid);
                 publishGreetingForPlayer(uuid);
                 return;
@@ -221,7 +242,6 @@ public class PersonalityGenerator {
             LOGGER.error("Error generando personalidad por jugador: {}", e.getMessage());
         }
 
-        // Fallback: crear personalidad aleatoria para este jugador
         LOGGER.info("Creando personalidad de respaldo para jugador {}", uuid);
         createFallbackPlayerPersonality(uuid, playerLanguage);
         blackboard.removePendingPersonality(uuid);
@@ -230,33 +250,29 @@ public class PersonalityGenerator {
 
     private void createFallbackPlayerPersonality(String uuid, String playerLanguage) {
         Random random = new Random();
-        
-        // Nombres según el idioma del jugador
+        IBotLanguageProvider provider = LanguageManager.getProvider(playerLanguage);
+        String[] traitsArray = provider.getPersonalityTraits();
+        String[] stylesArray = provider.getSpeakingStyles();
         String[] names = getNamesByLanguage(playerLanguage);
         boolean isFemale = random.nextBoolean();
         String name = names[random.nextInt(names.length)];
-        
-        String trait1 = PERSONALITY_TRAITS[random.nextInt(PERSONALITY_TRAITS.length)];
-        String trait2 = PERSONALITY_TRAITS[random.nextInt(PERSONALITY_TRAITS.length)];
+        String trait1 = traitsArray[random.nextInt(traitsArray.length)];
+        String trait2 = traitsArray[random.nextInt(traitsArray.length)];
         while (trait2.equals(trait1)) {
-            trait2 = PERSONALITY_TRAITS[random.nextInt(PERSONALITY_TRAITS.length)];
+            trait2 = traitsArray[random.nextInt(traitsArray.length)];
         }
-        
-        String style1 = SPEAKING_STYLES[random.nextInt(SPEAKING_STYLES.length)];
-        String style2 = SPEAKING_STYLES[random.nextInt(SPEAKING_STYLES.length)];
+        String style1 = stylesArray[random.nextInt(stylesArray.length)];
+        String style2 = stylesArray[random.nextInt(stylesArray.length)];
         while (style2.equals(style1)) {
-            style2 = SPEAKING_STYLES[random.nextInt(SPEAKING_STYLES.length)];
+            style2 = stylesArray[random.nextInt(stylesArray.length)];
         }
-        
         int age = 18 + random.nextInt(11);
-        
         JsonObject fallback = new JsonObject();
         fallback.addProperty("name", name);
         fallback.addProperty("gender", isFemale ? "female" : "male");
         fallback.addProperty("age", String.valueOf(age));
         fallback.addProperty("traits", trait1 + ", " + trait2);
         fallback.addProperty("speakingStyle", style1 + ", " + style2);
-        
         blackboard.setPlayerPersonality(uuid, fallback);
         dataManager.saveData();
         LOGGER.info("Personalidad de respaldo para jugador: {} ({}, {} años)", name, isFemale ? "female" : "male", age);
@@ -567,6 +583,24 @@ public class PersonalityGenerator {
                 LOGGER.error("Error al procesar jugador pendiente: {}", e.getMessage());
             }
         }
+    }
+
+    private String getLanguageNameForPrompt(String languageCode) {
+        if (languageCode == null) return "English";
+        String base = languageCode.split("_")[0];
+        return switch (base) {
+            case "es" -> "Español";
+            case "pt" -> "Português";
+            case "fr" -> "Français";
+            case "de" -> "Deutsch";
+            case "it" -> "Italiano";
+            case "ja" -> "日本語";
+            case "ko" -> "한국어";
+            case "zh" -> "中文";
+            case "ru" -> "Русский";
+            case "pl" -> "Polski";
+            default -> "English";
+        };
     }
 }
 

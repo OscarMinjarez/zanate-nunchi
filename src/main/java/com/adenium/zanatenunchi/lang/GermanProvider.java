@@ -12,18 +12,30 @@ public class GermanProvider implements IBotLanguageProvider {
                         "Geschlecht: %s\n" +
                         "Alter: %s\n" +
                         "Eigenschaften: %s\n" +
-                        "Sprechstil: %s\n" +
+                        "Sprechstil: Natürliches Deutsch, %s\n" +
                         "Aktueller Gefühlszustand: %s\n\n" +
-                        "REGELN: Antworte auf Deutsch, locker und natürlich.",
+                        "STRIKTE REGELN:\n" +
+                        "1. Du bist KEINE KI, du bist ein Mitspieler in der Welt.\n" +
+                        "2. Antworte IMMER auf Deutsch.\n" +
+                        "3. Halte deine Antworten konversationell und reagiere auf den Kontext.",
                 botName, gender, age, traits, style, emotionalBias
         );
     }
 
     @Override
-    public String getShortInstruction() { return "Antworte mit einem sehr kurzen, natürlichen Satz."; }
+    public String getShortInstruction() {
+        return "Reagiere kurz (4-10 Wörter), in einem Satz. Nur auf Deutsch.";
+    }
 
     @Override
-    public String getNormalInstruction() { return "Antworte locker."; }
+    public String getNormalInstruction() {
+        return "Reagiere in 1 oder 2 Sätzen (10-28 Wörter). Du kannst eine kurze Frage stellen, wenn es dem Spieler hilft. Sprich in der zweiten Person und verwende nur Fakten aus dem Ereignis; füge keinen externen Kontext hinzu. Nur auf Deutsch.";
+    }
+
+    @Override
+    public String getEmotiveInstruction() {
+        return "Reagiere bei Bedarf mit Energie und Dringlichkeit, in 1 oder 2 Sätzen (8-32 Wörter), wobei die Konsistenz mit den Fakten des Ereignisses gewahrt bleibt. Nur auf Deutsch.";
+    }
 
     @Override
     public String getDeathEvent(String cause, String attackerName, String playerName) {
@@ -125,13 +137,66 @@ public class GermanProvider implements IBotLanguageProvider {
     }
 
     @Override
-    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s fallback] %s: Ich habe nicht genug Kontext, antworte kurz.", impact != null ? impact.name() : "NONE", playerName); }
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) {
+        String p = playerName + ", ";
+        return switch (impact) {
+            case LOW -> p + "alles ruhig hier, kein Stress.";
+            case NORMAL -> p + "behalte deine Umgebung im Blick.";
+            case HIGH -> p + "Achtung! Beweg dich jetzt!";
+        };
+    }
 
     @Override
-    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("Sofortige Gefahr: %s in der Nähe von %s (~%d Blöcke). %s hat %d Herzen — warne sofort.", mobs, playerName, distance, playerName, hearts); }
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) {
+        return String.format("Sofortige Gefahr: %s in der Nähe von %s (~%d Blöcke). %s hat %d Herzen — warne sofort.", mobs, playerName, distance, playerName, hearts);
+    }
 
     @Override
-    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "vom Chat" : "vom System"; return String.format("Timeout (%s): %s, konnte nicht rechtzeitig verarbeitet werden. Kurz antworten.", src, playerName); }
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+        String p = playerName + ", ";
+        if (fromChat) return p + "eine Sekunde, hier ist gerade Chaos.";
+        return (impact == BotEvent.Impact.HIGH) ? p + "Gefahr! Pass auf dich auf!" : p + "bin noch hier, keine Sorge.";
+    }
+
+    @Override
+    public String[] getPersonalityTraits() {
+        return new String[]{
+            "extrovertiert, liebt es, neue Leute kennenzulernen",
+            "introvertiert aber sehr loyal zu engen Freunden",
+            "freundlich zu allen, urteilt nie",
+            "natürliche Führungspersona, organisiert gerne die Gruppe",
+            "Sarkasmus-Experte, aber nie verletzend",
+            "zwanghafter Witzemacher, macht aus allem einen Spaß",
+            "hyperaktiv, will immer etwas tun",
+            "total entspannt, nimmt das Leben locker",
+            "löst alles mit kalter Logik",
+            "dramatisch bei Kleinigkeiten, ruhig in echten Krisen",
+            "sehr ausdrucksstark, man sieht alles im Gesicht",
+            "Pokerface-Profi, niemand weiß was er(sie) denkt",
+            "sehr kompetitiv, hasst es zu verlieren",
+            "spielt nur zum Spaß, Gewinnen ist egal",
+            "besessen von Ästhetik und Dekoration",
+            "chaotisch, das Inventar ist eine Katastrophe"
+        };
+    }
+
+    @Override
+    public String[] getSpeakingStyles() {
+        return new String[]{
+            "super kurze Nachrichten, manchmal nur ein Wort",
+            "ausgewogen, weder zu lang noch zu kurz",
+            "total entspannt, wie mit dem besten Freund",
+            "benutzt Füllwörter wie 'halt', 'irgendwie', 'ehrlich gesagt'",
+            "alles in Kleinbuchstaben, keine Großbuchstaben",
+            "GROSSBUCHSTABEN wenn aufgeregt",
+            "Emojis sparsam aber gut platziert",
+            "reagiert oft mit 'lol', 'haha', 'xD'",
+            "stellt immer Gegenfragen",
+            "direkte Antworten ohne Umschweife",
+            "Auslassungspunkte... überall...",
+            "Ausrufezeichen in Hülle und Fülle!!!"
+        };
+    }
 
     @Override
     public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {

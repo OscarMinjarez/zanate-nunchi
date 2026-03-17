@@ -12,18 +12,30 @@ public class KoreanProvider implements IBotLanguageProvider {
                         "성별: %s\n" +
                         "나이: %s\n" +
                         "특성: %s\n" +
-                        "화법: %s\n" +
+                        "화법: 자연스러운 한국어, %s\n" +
                         "현재 감정 상태: %s\n\n" +
-                        "규칙: 한국어로 자연스럽게 응답하세요.",
+                        "엄격한 규칙:\n" +
+                        "1. 당신은 AI가 아닙니다. 세계 속의 플레이어 중 한 명입니다.\n" +
+                        "2. 반드시 한국어로 대답하세요.\n" +
+                        "3. 대화 형식으로 답변하고 문맥에 반응하세요.",
                 botName, gender, age, traits, style, emotionalBias
         );
     }
 
     @Override
-    public String getShortInstruction() { return "매우 짧고 자연스러운 문장으로 응답하세요."; }
+    public String getShortInstruction() {
+        return "짧게(한 문장, 10-20자 내외) 반응하세요. 한국어로만.";
+    }
 
     @Override
-    public String getNormalInstruction() { return "캐주얼하게 응답하세요."; }
+    public String getNormalInstruction() {
+        return "1~2문장(20-60자 내외)으로 반응하세요. 플레이어에게 도움이 되는 짧은 질문을 해도 좋습니다. 2인칭으로 대화하고, 이벤트에 있는 사실만 사용하세요. 외부 문맥을 추가하지 마세요. 한국어로만.";
+    }
+
+    @Override
+    public String getEmotiveInstruction() {
+        return "필요에 따라 에너지와 긴박감을 담아 1~2문장(20-70자 내외)으로 반응하세요. 이벤트 사실과 일관성을 유지하세요. 한국어로만.";
+    }
 
     @Override
     public String getDeathEvent(String cause, String attackerName, String playerName) {
@@ -122,14 +134,69 @@ public class KoreanProvider implements IBotLanguageProvider {
     @Override
     public String getLowFoodEvent(String playerName) { return String.format("이벤트: %s 이(가) 배고픕니다! 먹으라고 알려주세요.", playerName); }
 
-    @Override
-    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s 폴백] %s: 지금은 충분한 컨텍스트가 없습니다. 간단히 답하세요.", impact != null ? impact.name() : "NONE", playerName); }
 
     @Override
-    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("즉시 위험: %s 가 %s 근처에 있습니다 (~%d 블록). %s 는 %d 하트입니다 — 즉시 대피하세요.", mobs, playerName, distance, playerName, hearts); }
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) {
+        String p = playerName + ", ";
+        return switch (impact) {
+            case LOW -> p + "이쪽은 괜찮아, 걱정 마.";
+            case NORMAL -> p + "주위를 조심해, 마음 놓지 마.";
+            case HIGH -> p + "조심해! 지금 당장 움직여!";
+        };
+    }
 
     @Override
-    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "채팅에서" : "시스템에서"; return String.format("타임아웃 (%s): %s, 처리하지 못했습니다. 간단히 답하세요.", src, playerName); }
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) {
+        return String.format("즉각적인 위험: %s이 %s 근처에 있어(~%d 블록). %s는 %d 하트—지금 마로 달린여!", mobs, playerName, distance, playerName, hearts);
+    }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+        String p = playerName + ", ";
+        if (fromChat) return p + "잠깐만요, 지금 통 난리 달린 중이야.";
+        return (impact == BotEvent.Impact.HIGH) ? p + "위험해! 조심해!" : p + "아직 여기 있어, 걱정 마.";
+    }
+
+    @Override
+    public String[] getPersonalityTraits() {
+        return new String[]{
+            "외향적이고 새로운 사람을 만나는 걸 적이함",
+            "내향적이지만 가까운 친구에게는 매우 충성스러운",
+            "누구에게나 친절하고 절대 판단하지 않음",
+            "탄실적인 리더로 그룹을 이끌것을 좋아함",
+            "팅커즉 전문가인데 절대 상처를 주지 않음",
+            "개그 충동성으로 모든 것을 유머로 만듦",
+            "하이퍼하고 늘 문베가 넘쳐",
+            "어~주 충만하게 살아게",
+            "낭정한 논리로 모든 것을 해결함",
+            "사소한 일에 넘기지 만 진짜 위기 때는 질마하게 안정적임",
+            "표현이 풍부하게 모든 게 얼굴에 나타남",
+            "포커페이스 프로로 아무도 뭐수 바를 모름",
+            "지는 걸 싫어하는 미친 듯한 경쟁자",
+            "순수하게 재미를 위해 플레이하게 승보는 몸에 때라",
+            "미학과 인테리어에 차원이 다른 집착이 있음",
+            "혼란하게 인벤토리가 늘 엉망진창"
+        };
+    }
+
+    @Override
+    public String[] getSpeakingStyles() {
+        return new String[]{
+            "충동적으로 짧은 메시지, 가끔 한 마디만",
+            "균형 있게 너무 길지도 너무 짧지도 않음",
+            "완전 캐주얼, 단이두는 친구와 대화하비",
+            "'먹손', '헙', '진짜로' 같은 필러 많이 씀",
+            "소문자 전용, 대문자 없음",
+            "흥분되면 전어 대문자로!",
+            "이모지는 왜만 다량게 잘 배치해서 사용함",
+            "'짬', '움'으로 자주 반응함",
+            "항상 동시에 질문으로 돌려봄",
+            "직접적으로 핵심만 답함",
+            "점점점…어디서나…",
+            "뒤에 느낀표!!!"
+        };
+    }
+
 
     @Override
     public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {

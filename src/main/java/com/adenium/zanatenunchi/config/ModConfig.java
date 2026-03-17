@@ -108,7 +108,6 @@ public class ModConfig {
 
     public void save() {
         Path configPath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE);
-
         JsonObject json = new JsonObject();
 
         JsonObject ollama = new JsonObject();
@@ -139,7 +138,7 @@ public class ModConfig {
         try {
             Files.createDirectories(configPath.getParent());
             Files.writeString(configPath, GSON.toJson(json));
-            LOGGER.info("Configuración guardada en {}", configPath);
+            LOGGER.info("Configuración guardada exitosamente.");
         } catch (IOException e) {
             LOGGER.error("Error guardando configuración: {}", e.getMessage());
         }
@@ -160,7 +159,20 @@ public class ModConfig {
     public String getBotChatSuffix() { return botChatSuffix; }
     public String getLanguage() { return language; }
     public String getOwnerUUID() { return ownerUUID;  }
-    public void setOwnerUUID(String ownerUUID) { this.ownerUUID = ownerUUID; }
+
+    // Setters con guardado automático para los comandos
+    public void setOllamaUrl(String url) {
+        this.ollamaUrl = url;
+        save();
+    }
+
+    public void setOllamaModel(String model) {
+        this.ollamaModel = model;
+        save();
+    }
+
+    public void setOwnerUUID(String ownerUUID) {
+        this.ownerUUID = ownerUUID;
+        save();
+    }
 }
-
-

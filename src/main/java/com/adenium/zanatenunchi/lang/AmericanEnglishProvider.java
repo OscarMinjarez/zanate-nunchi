@@ -24,12 +24,17 @@ public class AmericanEnglishProvider implements IBotLanguageProvider {
 
     @Override
     public String getShortInstruction() {
-        return "Respond with a single, very short and natural sentence. English only.";
+        return "React briefly (4-10 words), in one sentence. American English only.";
     }
 
     @Override
     public String getNormalInstruction() {
-        return "Respond casually. English only.";
+        return "React in 1 or 2 sentences (10-28 words). You can ask a short question if it helps the player. Speak in second person and use only facts present in the event; do not add external context. American English only.";
+    }
+
+    @Override
+    public String getEmotiveInstruction() {
+        return "React with energy and urgency when applicable, in 1 or 2 sentences (8-32 words), maintaining consistency with the event facts. American English only.";
     }
 
     @Override
@@ -148,7 +153,12 @@ public class AmericanEnglishProvider implements IBotLanguageProvider {
 
     @Override
     public String getFallbackReply(BotEvent.Impact impact, String playerName) {
-        return String.format("[%s fallback] %s: I don't have enough context right now to give a full reply. Keep it short and natural.", impact != null ? impact.name() : "NONE", playerName);
+        String p = playerName + ", ";
+        return switch (impact) {
+            case LOW -> p + "all good here, don't sweat it.";
+            case NORMAL -> p + "keep an eye on your surroundings.";
+            case HIGH -> p + "watch out! move now!";
+        };
     }
 
     @Override
@@ -158,8 +168,49 @@ public class AmericanEnglishProvider implements IBotLanguageProvider {
 
     @Override
     public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
-        String src = fromChat ? "from chat" : "from system";
-        return String.format("Timeout (%s): %s, couldn't process in time. Reply briefly.", src, playerName);
+        String p = playerName + ", ";
+        if (fromChat) return p + "gimme a sec, it's a madhouse over here.";
+        return (impact == BotEvent.Impact.HIGH) ? p + "danger! watch yourself!" : p + "still here, don't worry.";
+    }
+
+    @Override
+    public String[] getPersonalityTraits() {
+        return new String[]{
+            "extroverted, loves meeting new people",
+            "introverted but fiercely loyal to close friends",
+            "friendly to everyone, never judges",
+            "natural leader, always organizing the squad",
+            "expert-level sarcastic, but never mean about it",
+            "compulsive jokester, turns everything into a bit",
+            "hyperactive, always down for something",
+            "super chill, takes everything in stride",
+            "solves problems with cold logic",
+            "dramatic over small stuff, calm during actual emergencies",
+            "very expressive, you can read them like a book",
+            "total poker face, impossible to read",
+            "fiercely competitive, hates losing",
+            "plays purely for fun, winning is irrelevant",
+            "obsessed with base aesthetics and building",
+            "chaotic, inventory is an absolute disaster"
+        };
+    }
+
+    @Override
+    public String[] getSpeakingStyles() {
+        return new String[]{
+            "super short messages, sometimes just a single word",
+            "balanced, never too long or too short",
+            "totally casual, like texting their best friend",
+            "uses filler words like 'like', 'literally', 'dude'",
+            "all lowercase, no caps at all",
+            "ALL CAPS when hyped up",
+            "uses emojis sparingly but always well-placed",
+            "constantly reacts with 'lol', 'lmao', 'ngl'",
+            "fires back with questions every time",
+            "straight to the point, no fluff",
+            "y'all enjoyer, throws in Southern slang naturally",
+            "loves using '!' and '!!!' when excited"
+        };
     }
 
     @Override
