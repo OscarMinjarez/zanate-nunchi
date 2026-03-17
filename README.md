@@ -19,6 +19,9 @@ Zanate Nunchi no es un "bot" genérico. **Cada jugador que se conecta recibe un 
 - **Estilo de habla** (ej. *directo*, *poético*, *informal*).
 Esta personalidad altera **todas** sus respuestas. Si tu bot es sarcástico, se burlará de ti cuando recibas daño; si es protector, entrará en pánico.
 
+<img width="1334" height="674" alt="image" src="https://github.com/user-attachments/assets/39c6afd3-8a0f-4946-8134-8261a6cb9a36" />
+<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/ca023102-4cc7-4c3b-8f0d-3652c3272d20" />
+
 ### 🧠 Arquitectura de Pizarra (Blackboard) y Contexto Espacial
 El bot no solo responde cuando le hablas. Observa constantemente tu partida de forma silenciosa e inteligente:
 - **Combate**: Detecta cuándo mueres, qué mob te mata, o si estás haciendo una masacre (multiplicadores de kills).
