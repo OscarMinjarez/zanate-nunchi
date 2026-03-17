@@ -466,7 +466,7 @@ public class PersonalityGenerator {
             }
         }
         // Rechazar nombres muy largos o raros
-        if (name.length() > 15 || name.contains("'") || name.contains("-") && name.length() > 10) {
+        if (name.length() > 15 || name.contains("'") || (name.contains("-") && name.length() > 10)) {
             LOGGER.warn("Nombre rechazado (formato): {}", name);
             return false;
         }

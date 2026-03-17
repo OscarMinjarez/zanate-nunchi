@@ -106,7 +106,7 @@ public class WorldObserver {
             if (!blackboard.hasPlayer(uuid)) continue;
 
             if (ThreadLocalRandom.current().nextInt(100) < chancePercent) {
-                String langCode = "en_us"; // Test MVP (Luego usaremos blackboard.getPlayerLanguage)
+                String langCode = blackboard.getPlayerLanguage(uuid);
                 IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
                 String promptText = langProvider.getWeatherEvent(weatherType, isStarting);
 
@@ -132,7 +132,7 @@ public class WorldObserver {
             String prev = blackboard.getLastBiome(uuid);
 
             if (prev != null && !current.equals(prev) && !current.equals("unknown") && NOTABLE_BIOMES.contains(current)) {
-                String langCode = "en_us"; // Test MVP
+                String langCode = blackboard.getPlayerLanguage(uuid);
                 IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
                 String playerName = player.getName().getString();
                 String promptText = langProvider.getBiomeChangeEvent(playerName, current);
@@ -162,7 +162,7 @@ public class WorldObserver {
             String prev = blackboard.getLastDimension(uuid);
 
             if (prev != null && !current.equals(prev)) {
-                String langCode = "en_us"; // Test MVP
+                String langCode = blackboard.getPlayerLanguage(uuid);
                 IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
                 String playerName = player.getName().getString();
 
@@ -189,7 +189,7 @@ public class WorldObserver {
             String uuid = player.getUUID().toString();
             if (!blackboard.hasPlayer(uuid)) continue;
 
-            String langCode = "en_us"; // Test MVP
+            String langCode = blackboard.getPlayerLanguage(uuid);
             IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
             String playerName = player.getName().getString();
 

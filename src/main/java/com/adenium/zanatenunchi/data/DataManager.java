@@ -38,6 +38,9 @@ public class DataManager {
             if (Files.exists(currentDataFile)) {
                 String content = Files.readString(currentDataFile);
                 JsonObject botData = JsonParser.parseString(content).getAsJsonObject();
+                if (!botData.has("players")) {
+                    botData.add("players", new JsonObject());
+                }
                 blackboard.setBotData(botData);
                 LOGGER.info("Datos cargados: {} jugadores registrados",
                         botData.getAsJsonObject("players").size());

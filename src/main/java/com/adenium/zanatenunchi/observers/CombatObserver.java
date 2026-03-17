@@ -36,7 +36,8 @@ public class CombatObserver {
     private void registerPlayerDeath() {
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
             if (!(entity instanceof ServerPlayer player)) return;
-            String langCode = "en_us"; // Test MVP
+            String uuid = player.getUUID().toString();
+            String langCode = blackboard.getPlayerLanguage(uuid);
             IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
             String cause = damageSource.getMsgId();
             String attackerName = damageSource.getEntity() != null
@@ -64,7 +65,7 @@ public class CombatObserver {
             long last = lastStrongHitMs.getOrDefault(uuid, 0L);
             if ((now - last) < STRONG_HIT_COOLDOWN_MS) return;
             lastStrongHitMs.put(uuid, now);
-            String langCode = "en_us"; // Test MVP
+            String langCode = blackboard.getPlayerLanguage(uuid);
             IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
             String attackerName = source.getEntity() != null
                     ? source.getEntity().getName().getString() : null;
@@ -112,7 +113,8 @@ public class CombatObserver {
                     return;
                 }
             }
-            String langCode = "en_us"; // Test MVP
+            String uuid = player.getUUID().toString();
+            String langCode = blackboard.getPlayerLanguage(uuid);
             IBotLanguageProvider langProvider = LanguageManager.getProvider(langCode);
             String mobDisplayName = entity.getName().getString();
             String playerName = player.getName().getString();

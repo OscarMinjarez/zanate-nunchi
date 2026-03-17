@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class ItalianProvider implements IBotLanguageProvider {
 
     @Override
@@ -120,6 +122,31 @@ public class ItalianProvider implements IBotLanguageProvider {
     @Override
     public String getLowFoodEvent(String playerName) {
         return String.format("Evento: %s está com pouca comida! Dile que coma algo.", playerName);
+    }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s fallback] %s: Non ho abbastanza contesto in questo momento. Rispondi in modo breve.", impact != null ? impact.name() : "NONE", playerName); }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("Pericolo immediato: %s vicino a %s (~%d blocchi). %s ha %d cuori — avverti subito.", mobs, playerName, distance, playerName, hearts); }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "dalla chat" : "dal sistema"; return String.format("Timeout (%s): %s, non è stato possibile processare in tempo. Rispondi brevemente.", src, playerName); }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("sarcastico") || t.contains("ironico") || t.contains("sarcástic")) return "Oh, un altro... e tu chi saresti?";
+            if (t.contains("timido") || t.contains("introverso") || t.contains("tímid")) return "Ehm... ciao. Come ti chiami?";
+            if (t.contains("coraggioso") || t.contains("audace") || t.contains("valiente")) return "Ehi! Sei nuovo? Dimmi il tuo nome!";
+            if (t.contains("allegro") || t.contains("estroverso") || t.contains("alegre")) return "Ciao!! Come ti chiami? 😄";
+            return "Ciao! Come ti chiami?";
+        }
+        if (t.contains("sarcastico") || t.contains("ironico") || t.contains("sarcástic")) return "Guarda chi si rivede... " + playerName + ".";
+        if (t.contains("timido") || t.contains("introverso") || t.contains("tímid")) return "Oh, " + playerName + "... bene che sei tornato.";
+        if (t.contains("allegro") || t.contains("estroverso") || t.contains("alegre")) return playerName + "!! Che bello rivederti! 🎉";
+        return "Bentornato, " + playerName + "!";
     }
 }
 

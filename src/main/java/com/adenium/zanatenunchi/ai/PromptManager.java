@@ -53,7 +53,7 @@ public class PromptManager {
                 "\n✅ Evento: lluvia → '¡Uf, qué aguacero! Mejor nos refugiamos o nos va a dar un rayo.'" +
                 "\n✅ Evento: encontró diamantes → '¡NO MAMES, DIAMANTES! ¡Guárdalos bien!'" +
                 "\nTU SESGO EMOCIONAL: " + emotionalBias +
-                "\n\nResponde SOLO con el mensaje de chat. Idioma: " + lang;
+                "\n\nResponde SOLO con el mensaje de chat. Idioma: " + lang.languageName();
     }
 
     /**

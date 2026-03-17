@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class MexicanSpanishProvider implements IBotLanguageProvider {
 
     @Override
@@ -142,5 +144,62 @@ public class MexicanSpanishProvider implements IBotLanguageProvider {
             default -> "es medianoche";
         };
         return String.format("Contexto: %s está en %s, %s, bioma: %s. Vida: %d, hambre: %d/20. Di algo espontáneo y natural sobre esta situación.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) {
+        String p = playerName + ", ";
+        return switch (impact) {
+            case LOW -> p + "todo en orden, pero no te me fíes.";
+            case NORMAL -> p + "ojo con el entorno, mantén la calma.";
+            case HIGH -> p + "¡Cuidado! Muévete ya.";
+        };
+    }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) {
+        String p = playerName + ", ";
+        int v = (int)(System.currentTimeMillis() / 1000 % 3);
+        if (hearts <= 4) return switch (v) {
+            case 0 -> p + "¡Estás a nada de morir! Cúbrete y cúrate ya.";
+            case 1 -> p + "¡Te vas a morir! ¡Come algo o escóndete ya!";
+            default -> p + "¡Wey, te queda nada de vida! ¡Muévete!";
+        };
+        if (distance <= 3) return switch (v) {
+            case 0 -> p + "Tienes a los " + mobs + " encima, ¡vete de ahí!";
+            case 1 -> p + "¡Los " + mobs + " están pegados a ti! ¡Corre!";
+            default -> p + "¡Aguas con los " + mobs + "! ¡Están a nada de ti!";
+        };
+        return switch (v) {
+            case 0 -> p + "Ojo con esos " + mobs + ", se te están acercando mucho.";
+            case 1 -> p + "Cuídate, esos " + mobs + " se acercan. No bajes la guardia.";
+            default -> p + "Los " + mobs + " te traen de bajada, ¡no te confíes!";
+        };
+    }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+        String p = playerName + ", ";
+        if (fromChat) return p + "aguántame tantito, ando en medio del caos y ahorita te respondo.";
+        return (impact == BotEvent.Impact.HIGH) ? p + "¡Peligro inmediato! ¡Reacciona!" : p + "Sigo aquí, no te me desesperes.";
+    }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("sarcástic") || t.contains("irónic")) return "Ah, otro aventurero... bueno, ¿y tú quién eres?";
+            if (t.contains("tímid") || t.contains("introvertid")) return "Eh... hola. No te conozco, ¿cómo te llamas?";
+            if (t.contains("valiente") || t.contains("audaz")) return "¡Ey! ¿Nuevo por aquí? ¡Dime tu nombre, compa!";
+            if (t.contains("alegre") || t.contains("extrovertid")) return "¡¡Hola!! ¡Qué onda! ¿Cómo te llamas? 😄";
+            if (t.contains("perezos") || t.contains("tranquil")) return "Oh, alguien nuevo... ¿y tú quién eres?";
+            return "¡Hola! ¿Cómo te llamas?";
+        }
+        if (t.contains("sarcástic") || t.contains("irónic")) return "Mira quién se dignó a volver... " + playerName + ".";
+        if (t.contains("tímid") || t.contains("introvertid")) return "Oh, " + playerName + "... qué bueno que volviste.";
+        if (t.contains("valiente") || t.contains("audaz")) return "¡" + playerName + "! ¡Órale, listos para la acción!";
+        if (t.contains("alegre") || t.contains("extrovertid")) return "¡¡" + playerName + "!! ¡Qué gusto verte de nuevo! 🎉";
+        if (t.contains("perezos") || t.contains("tranquil")) return "Ah, " + playerName + "... ya te habías tardado.";
+        return "¡Qué onda, " + playerName + "! Un gusto verte de nuevo.";
     }
 }

@@ -34,70 +34,70 @@ public class LanguageManager {
         // Español - Variantes
         PROFILES.put("es_mx", new LanguageProfile(
                 "es_mx", "Español (México)", "español mexicano",
-                "Habla como un amigo mexicano en Discord: natural, directo, con confianza. Usa 'tú'. Sé coloquial sin groserías. Prioriza emoción."
+                "Habla EXCLUSIVAMENTE como un mexicano: usa 'tú', expresiones como 'órale', 'wey', 'neta', 'qué onda', 'chido'. NUNCA uses 'che', 'vos', 'boludo' (argentino), ni 'ñero', 'parce' (colombiano), ni 'tío', 'mola' (español). Sé coloquial sin groserías fuertes. Prioriza emoción."
         ));
 
         PROFILES.put("es_es", new LanguageProfile(
                 "es_es", "Español (España)", "español de España",
-                "Habla como un amigo español en Discord: natural, tono relajado. Usa 'tú'. Evita formalidades innecesarias."
+                "Habla EXCLUSIVAMENTE como un español de España: usa 'tú' (o 'vosotros'), expresiones como 'tío', 'chaval', 'mola', 'guay', 'hostia'. NUNCA uses modismos latinos como 'wey', 'che', 'parce', 'pendejo', 'chido'. Sé coloquial sin groserías fuertes. Prioriza emoción."
         ));
 
         PROFILES.put("es_ar", new LanguageProfile(
                 "es_ar", "Español (Argentina)", "español argentino",
-                "Habla como un amigo argentino en Discord: natural, con voseo casual ('vos'). Sé cálido y expresivo."
+                "Habla EXCLUSIVAMENTE como un argentino: usa 'vos', expresiones como 'che', 'boludo', 'pibe', 're', 'copado'. NUNCA uses modismos mexicanos o españoles como 'wey', 'chido', 'tío', 'mola', 'parce'. Sé coloquial sin groserías fuertes. Prioriza emoción."
         ));
 
         PROFILES.put("es_cl", new LanguageProfile(
                 "es_cl", "Español (Chile)", "español chileno",
-                "Habla como un amigo chileno en Discord: natural, tutea. Sé casual sin forzar modismos."
+                "Habla EXCLUSIVAMENTE como un chileno: usa 'tú' o voseo chileno, expresiones como 'huevón', 'weón', 'cachai', 'bacán', 'po'. NUNCA uses modismos mexicanos, argentinos o españoles como 'wey', 'che', 'tío', 'parce'. Sé coloquial sin groserías fuertes. Prioriza emoción."
         ));
 
         PROFILES.put("es_co", new LanguageProfile(
                 "es_co", "Español (Colombia)", "español colombiano",
-                "Habla como un amigo colombiano en Discord: natural, tutea. Sé cercano y amigable."
+                "Habla EXCLUSIVAMENTE como un colombiano: usa 'tú' o 'usted', expresiones como 'parce', 'chimba', 'marica', 'bacano', 'qué más'. NUNCA uses modismos mexicanos, argentinos o españoles como 'wey', 'che', 'tío', 'mola'. Sé coloquial sin groserías fuertes. Prioriza emoción."
         ));
 
         PROFILES.put("es_ve", new LanguageProfile(
                 "es_ve", "Español (Venezuela)", "español venezolano",
-                "Habla como un amigo venezolano en Discord: natural, tutea. Sé cálido y expresivo."
+                "Habla EXCLUSIVAMENTE como un venezolano: usa 'tú', expresiones como 'chamo', 'pana', 'fino', 'chévere'. NUNCA uses modismos mexicanos, argentinos o españoles como 'wey', 'che', 'tío', 'parce'. Sé coloquial sin groserías fuertes. Prioriza emoción."
         ));
 
         // Inglés - Variantes
         PROFILES.put("en_us", new LanguageProfile(
                 "en_us", "English (US)", "American English",
-                "Speak like a friendly gamer on Discord: casual, direct, expressive. Use 'you'. Prioritize personality."
+                "Speak EXCLUSIVELY in American English: use 'dude', 'bro', 'awesome', 'cool', 'y'all'. NEVER use British or Aussie slang like 'mate', 'lad', 'bloke', 'innit', 'cheers', 'crikey'. Speak casually. Prioritize emotion."
         ));
 
         PROFILES.put("en_gb", new LanguageProfile(
                 "en_gb", "English (UK)", "British English",
-                "Speak like a friendly UK gamer on Discord: casual, natural. Use British spellings. Be relaxed."
+                "Speak EXCLUSIVELY in British English: use 'mate', 'lad', 'brilliant', 'cheers', 'innit', 'bloody'. NEVER use American or Aussie slang like 'dude', 'bro', 'awesome', 'y'all', 'crikey'. Speak casually. Prioritize emotion."
         ));
 
         PROFILES.put("en_au", new LanguageProfile(
                 "en_au", "English (Australia)", "Australian English",
-                "Speak like a friendly Aussie gamer: casual, relaxed. Be natural and expressive."
+                "Speak EXCLUSIVELY in Australian English: use 'mate', 'cobber', 'bloody oath', 'crikey'. NEVER use American or UK slang like 'dude', 'bro', 'awesome', 'innit', 'bloke'. Speak casually. Prioritize emotion."
         ));
 
         // Portugués
         PROFILES.put("pt_br", new LanguageProfile(
                 "pt_br", "Português (Brasil)", "português brasileiro",
-                "Fale como um amigo brasileiro no Discord: natural, casual, expressivo. Não use português de Portugal."
+                "Fale EXCLUSIVAMENTE em Português do Brasil: use 'você', expressões como 'cara', 'mano', 'legal', 'massa', 'e aí'. NUNCA use gírias de Portugal como 'fixe', 'bué', 'gajo', 'rapariga'. Seja coloquial. Priorize a emoção."
         ));
 
         PROFILES.put("pt_pt", new LanguageProfile(
                 "pt_pt", "Português (Portugal)", "português europeu",
-                "Fale como um amigo português no Discord: natural, casual. Seja expressivo."
+                "Fale EXCLUSIVAMENTE em Português de Portugal: use 'tu', expressões como 'fixe', 'bué', 'gajo', 'pá', 'porreiro'. NUNCA use gírias brasileiras como 'cara', 'mano', 'legal', 'massa'. Seja coloquial. Priorize a emoção."
         ));
 
         // Francés
         PROFILES.put("fr_fr", new LanguageProfile(
                 "fr_fr", "Français", "français",
-                "Parle comme un ami sur Discord: naturel, décontracté, expressif. Comme entre potes."
+                "Parle EXCLUSIVEMENT en Français de France: utilise 'tu', des expressions comme 'mec', 'meuf', 'super', 'génial', 'grave'. N'utilise JAMAIS d'expressions québécoises comme 'tabarnak', 'ostie', 'niaiseux'. Sois familier. Priorise l'émotion."
         ));
 
         PROFILES.put("fr_ca", new LanguageProfile(
                 "fr_ca", "Français (Canada)", "français québécois",
-                "Parle comme un ami québécois sur Discord: naturel, casual. Sois expressif."
+                "Parle EXCLUSIVEMENT en Français du Québec: utilise 'tu', des expressions comme 'mec', 'esti', 'tabarnak', 'niaiseux', 'ben oui'. N'utilise JAMAIS d'argot de France comme 'meuf', 'verlan', 'wesh'. Sois familier. Priorise l'émotion."
         ));
 
         // Alemán
@@ -222,20 +222,20 @@ public class LanguageManager {
                 case "es_cl" -> "Habla COMO UN AMIGO CHILENO EN DISCORD: natural, tutea. Sé casual sin forzar modismos. Prioriza emoción. Prohibido groserías.";
                 case "es_co" -> "Habla COMO UN AMIGO COLOMBIANO EN DISCORD: natural, tutea. Sé cercano. Prioriza emoción. Prohibido groserías.";
                 case "es_ve" -> "Habla COMO UN AMIGO VENEZOLANO EN DISCORD: natural, tutea. Sé cálido. Prioriza emoción. Prohibido groserías.";
-                case "en_us" -> "Speak LIKE A FRIENDLY US GAMER ON DISCORD: casual, direct, expressive. Use 'you'. NUNCA uses 'mate', 'cheers' o expresiones UK. Prioritize personality. No profanity.";
-                case "en_gb" -> "Speak LIKE A FRIENDLY UK GAMER ON DISCORD: casual, natural. Use British spellings. NUNCA uses 'dude', 'y'all' o expresiones US. Be relaxed. No profanity.";
-                case "en_au" -> "Speak LIKE A FRIENDLY AUSSIE GAMER: casual, relaxed. NUNCA uses 'mate' en exceso. Be natural. No profanity.";
+                case "en_us" -> "Speak LIKE A FRIENDLY US GAMER ON DISCORD: casual, direct, expressive. Use 'you'. NEVER use 'mate', 'cheers' or UK expressions. Prioritize personality. No profanity.";
+                case "en_gb" -> "Speak LIKE A FRIENDLY UK GAMER ON DISCORD: casual, natural. Use British spellings. NEVER use 'dude', 'y'all' or US expressions. Be relaxed. No profanity.";
+                case "en_au" -> "Speak LIKE A FRIENDLY AUSSIE GAMER: casual, relaxed. NEVER overuse 'mate'. Be natural. No profanity.";
                 case "pt_br" -> "Fale COMO UM AMIGO BRASILEIRO NO DISCORD: natural, casual, expressivo. Use 'você'. NUNCA use português de Portugal. Priorize emoção. Sem palavrões.";
                 case "pt_pt" -> "Fale COMO UM AMIGO PORTUGUÊS NO DISCORD: natural, casual. NUNCA use expressões brasileiras. Seja expressivo. Sem palavrões.";
-                case "fr_fr" -> "Parle COMME UN AMI FRANÇAIS SUR DISCORD: naturel, décontracté. NUNCA use d'expressions québécoises. Sois expressif. Pas de grossièretés.";
-                case "fr_ca" -> "Parle COMME UN AMI QUÉBÉCOIS SUR DISCORD: naturel, casual. NUNCA use d'expressions de France. Sois expressif. Pas de grossièretés.";
-                case "de_de" -> "Sprich WIE EIN FREUND AUF DISCORD: natürlich, locker. NUNCA formell oder distanziert. Sei expressiv. Keine Schimpfwörter.";
-                case "it_it" -> "Parla COME UN AMICO SU DISCORD: naturale, colloquiale. NUNCA formale o distaccato. Sii espressivo. Niente parolacce.";
+                case "fr_fr" -> "Parle COMME UN AMI FRANÇAIS SUR DISCORD: naturel, décontracté. JAMAIS d'expressions québécoises. Sois expressif. Pas de grossièretés.";
+                case "fr_ca" -> "Parle COMME UN AMI QUÉBÉCOIS SUR DISCORD: naturel, casual. JAMAIS d'expressions de France. Sois expressif. Pas de grossièretés.";
+                case "de_de" -> "Sprich WIE EIN FREUND AUF DISCORD: natürlich, locker. NIEMALS formell oder distanziert. Sei expressiv. Keine Schimpfwörter.";
+                case "it_it" -> "Parla COME UN AMICO SU DISCORD: naturale, colloquiale. MAI formale o distaccato. Sii espressivo. Niente parolacce.";
                 case "ja_jp" -> "友達とDiscordで話してるみたいに、自然でカジュアルな日本語で。感情を込めて。丁寧語は不要。汚い言葉は禁止。";
                 case "ko_kr" -> "친구와 디스코드에서 채팅하듯이 자연스럽고 캐주얼한 한국어로. 감정을 담아. 존댓말 불필요. 비속어 금지.";
                 case "zh_cn" -> "像和朋友在Discord聊天一样，用自然轻松的中文。带点情绪更自然。不用太正式。禁止脏话。";
                 case "zh_tw" -> "像和朋友在Discord聊天一樣，用自然輕鬆的中文。帶點情緒更自然。不用太正式。禁止髒話。";
-                case "ru_ru" -> "Говори КАК ДРУГ В ДИСКОРДЕ: естественно, непринуждённо. NUNCA формально. С эмоциями. Без мата.";
+                case "ru_ru" -> "Говори КАК ДРУГ В ДИСКОРДЕ: естественно, непринуждённо. НИКОГДА формально. С эмоциями. Без мата.";
                 case "pl_pl" -> "Mów JAK PRZYJACIEL NA DISCORDZIE: naturalnie, luźno. NIGDY formalnie. Z emocjami. Bez wulgaryzmów.";
                 default -> "Habla como un amigo en Discord: natural, directo, con confianza. Prioriza emoción sobre precisión. Prohibido groserías.";
             };

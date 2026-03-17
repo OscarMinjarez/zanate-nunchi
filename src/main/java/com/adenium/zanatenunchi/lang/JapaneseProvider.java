@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class JapaneseProvider implements IBotLanguageProvider {
 
     @Override
@@ -120,6 +122,31 @@ public class JapaneseProvider implements IBotLanguageProvider {
     @Override
     public String getLowFoodEvent(String playerName) {
         return String.format("イベント: %s は空腹です！何か食べるように言ってください。", playerName);
+    }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s フォールバック] %s: 十分なコンテキストがありません。短く返答してください。", impact != null ? impact.name() : "NONE", playerName); }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("即時危険: %s が %s の近くにいます (~%dブロック)。%s は %d ハートです — すぐに避難するよう警告してください。", mobs, playerName, distance, playerName, hearts); }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "チャットから" : "システムから"; return String.format("タイムアウト (%s): %s、処理できませんでした。短く返信してください。", src, playerName); }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("皮肉") || t.contains("sarcástic")) return "ふーん、また新しいのが来たか…で、誰？";
+            if (t.contains("恥ずかしがり") || t.contains("内向") || t.contains("tímid")) return "あの…こんにちは。お名前は？";
+            if (t.contains("勇敢") || t.contains("valiente")) return "おい！新入り？名前を教えろ！";
+            if (t.contains("陽気") || t.contains("外向") || t.contains("alegre")) return "こんにちは！！お名前は？😄";
+            return "こんにちは！お名前は？";
+        }
+        if (t.contains("皮肉") || t.contains("sarcástic")) return "おや、誰かと思えば…" + playerName + "か。";
+        if (t.contains("恥ずかしがり") || t.contains("内向") || t.contains("tímid")) return "あ、" + playerName + "さん…戻ってきてくれたんだね。";
+        if (t.contains("陽気") || t.contains("外向") || t.contains("alegre")) return playerName + "！！また会えて嬉しい！🎉";
+        return "お帰りなさい、" + playerName + "！";
     }
 }
 

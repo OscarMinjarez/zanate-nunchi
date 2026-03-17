@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class KoreanProvider implements IBotLanguageProvider {
 
     @Override
@@ -119,5 +121,30 @@ public class KoreanProvider implements IBotLanguageProvider {
 
     @Override
     public String getLowFoodEvent(String playerName) { return String.format("이벤트: %s 이(가) 배고픕니다! 먹으라고 알려주세요.", playerName); }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s 폴백] %s: 지금은 충분한 컨텍스트가 없습니다. 간단히 답하세요.", impact != null ? impact.name() : "NONE", playerName); }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("즉시 위험: %s 가 %s 근처에 있습니다 (~%d 블록). %s 는 %d 하트입니다 — 즉시 대피하세요.", mobs, playerName, distance, playerName, hearts); }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "채팅에서" : "시스템에서"; return String.format("타임아웃 (%s): %s, 처리하지 못했습니다. 간단히 답하세요.", src, playerName); }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("비꼬") || t.contains("sarcástic")) return "오, 또 새로운 사람이네... 넌 누구야?";
+            if (t.contains("수줍") || t.contains("내향") || t.contains("tímid")) return "음... 안녕하세요. 이름이 뭐예요?";
+            if (t.contains("용감") || t.contains("valiente")) return "야! 새로 왔어? 이름이 뭐야!";
+            if (t.contains("밝") || t.contains("외향") || t.contains("alegre")) return "안녕하세요!! 이름이 뭐예요? 😄";
+            return "안녕하세요! 이름이 뭐예요?";
+        }
+        if (t.contains("비꼬") || t.contains("sarcástic")) return "누가 왔나 했더니... " + playerName + "이구나.";
+        if (t.contains("수줍") || t.contains("내향") || t.contains("tímid")) return "아, " + playerName + "... 돌아와서 다행이에요.";
+        if (t.contains("밝") || t.contains("외향") || t.contains("alegre")) return playerName + "!! 다시 만나서 너무 반가워요! 🎉";
+        return "돌아와서 반가워요, " + playerName + "!";
+    }
 }
 

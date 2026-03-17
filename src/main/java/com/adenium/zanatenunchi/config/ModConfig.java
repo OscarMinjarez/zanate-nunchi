@@ -17,6 +17,7 @@ public class ModConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger("ModConfig");
     private static final String CONFIG_FILE = "ollama_bot.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private String ownerUUID = "";
 
     private static ModConfig instance;
 
@@ -158,6 +159,8 @@ public class ModConfig {
     public String getBotChatPrefix() { return botChatPrefix; }
     public String getBotChatSuffix() { return botChatSuffix; }
     public String getLanguage() { return language; }
+    public String getOwnerUUID() { return ownerUUID;  }
+    public void setOwnerUUID(String ownerUUID) { this.ownerUUID = ownerUUID; }
 }
 
 

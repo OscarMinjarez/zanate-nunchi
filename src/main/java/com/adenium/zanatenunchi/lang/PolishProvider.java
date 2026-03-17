@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class PolishProvider implements IBotLanguageProvider {
 
     @Override
@@ -119,5 +121,30 @@ public class PolishProvider implements IBotLanguageProvider {
 
     @Override
     public String getLowFoodEvent(String playerName) { return String.format("Wydarzenie: %s ma mało jedzenia! Powiedz, żeby zjadł coś.", playerName); }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s fallback] %s: Nie mam wystarczającego kontekstu. Odpowiedz krótko.", impact != null ? impact.name() : "NONE", playerName); }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("Natychmiastowe niebezpieczeństwo: %s blisko %s (~%d bloków). %s ma %d serc — ostrzeż natychmiast.", mobs, playerName, distance, playerName, hearts); }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "z czatu" : "z systemu"; return String.format("Timeout (%s): %s, nie przetworzono na czas. Odpowiedz krótko.", src, playerName); }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("sarkastyczn") || t.contains("ironiczn") || t.contains("sarcástic")) return "O, kolejny... a ty kto?";
+            if (t.contains("nieśmiał") || t.contains("introwerty") || t.contains("tímid")) return "Eee... cześć. Jak masz na imię?";
+            if (t.contains("odważn") || t.contains("valiente")) return "Hej! Nowy? Powiedz mi swoje imię!";
+            if (t.contains("wesoł") || t.contains("ekstrawerty") || t.contains("alegre")) return "Cześć!! Jak masz na imię? 😄";
+            return "Cześć! Jak masz na imię?";
+        }
+        if (t.contains("sarkastyczn") || t.contains("ironiczn") || t.contains("sarcástic")) return "Popatrzcie, kto wrócił... " + playerName + ".";
+        if (t.contains("nieśmiał") || t.contains("introwerty") || t.contains("tímid")) return "Oh, " + playerName + "... dobrze, że wróciłeś.";
+        if (t.contains("wesoł") || t.contains("ekstrawerty") || t.contains("alegre")) return playerName + "!! Jak miło cię znowu widzieć! 🎉";
+        return "Witaj ponownie, " + playerName + "!";
+    }
 }
 

@@ -14,567 +14,250 @@ public class Blackboard {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Blackboard");
     private static final int MAX_EVENTS_PER_PLAYER = 5;
-    private static final int INITIAL_QUEUE_CAPACITY = 50;
+    private static final int INITIAL_QUEUE_CAPACITY = 10;
     private static final long LOW_EVENT_DEDUPE_MS = 90_000L;
+    private final Map<String, Long> nextSpontMs = new ConcurrentHashMap<>();
 
     private static Blackboard instance;
-
     private volatile MinecraftServer currentServer;
     private volatile JsonObject botData;
 
-    private final PriorityBlockingQueue<BotEvent> eventQueue;
+    // Colas por jugador para IA Personal
+    private final Map<UUID, PriorityBlockingQueue<BotEvent>> playerEventQueues = new ConcurrentHashMap<>();
 
-    private final Map<String, Long> lastSpontaneousMs;
-    private final Map<String, Long> lastHighEventMs;
-    private final Map<String, Long> lastReactiveEventMs;
-    private final Map<String, Long> recentLowEventSignatures;
-    private final Map<String, Long> nextSpontMs;
+    // Rastreo de tiempo y cooldowns
+    private final Map<String, Long> lastHighEventMs = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastReactiveEventMs = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastSpontaneousMs = new ConcurrentHashMap<>();
+    private final Map<String, Long> recentLowEventSignatures = new ConcurrentHashMap<>();
 
-    private final Map<String, Boolean> dangerWarned;
-    private final Map<String, Boolean> lowHealthWarned;
-    private final Map<String, Boolean> lowFoodWarned;
+    // Estados de advertencia (Para que no sea un bot enfadoso)
+    private final Map<String, Boolean> dangerWarned = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> lowHealthWarned = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> lowFoodWarned = new ConcurrentHashMap<>();
 
-    private final Map<String, String> lastBiome;
-    private final Map<String, String> lastDimension;
-    private final Map<String, String> playerLanguage;
+    // Rastreo de entorno
+    private final Map<String, String> lastBiome = new ConcurrentHashMap<>();
+    private final Map<String, String> lastDimension = new ConcurrentHashMap<>();
+    private final Map<String, String> playerLanguage = new ConcurrentHashMap<>();
 
-    private final Set<String> awaitingName;
-    private final Set<String> pendingGreeting;
-    private final Set<String> pendingPersonality;
-    private final Set<UUID> highInProcessPlayers;
+    // Estado global del mundo (tiempo/tiempo del día) que algunos observers consultan
+    private volatile long lastDayTime = 0L;
+    private volatile boolean wasRainingFlag = false;
+    private volatile boolean wasThunderingFlag = false;
 
-    private volatile long lastDayTime = -1;
-    private volatile boolean wasRaining = false;
-    private volatile boolean wasThundering = false;
+    // Sets de control de flujo
+    private final Set<String> awaitingName = Collections.synchronizedSet(new HashSet<>());
+    private final Set<String> pendingGreeting = Collections.synchronizedSet(new HashSet<>());
+    private final Set<String> pendingPersonality = Collections.synchronizedSet(new HashSet<>());
+    private final Set<UUID> highInProcessPlayers = Collections.synchronizedSet(new HashSet<>());
+
     private volatile String serverLanguage = "es_mx";
-
     private final Object dataLock = new Object();
 
-    private Blackboard() {
-        this.eventQueue = new PriorityBlockingQueue<>(INITIAL_QUEUE_CAPACITY);
-        this.lastSpontaneousMs = new ConcurrentHashMap<>();
-        this.lastHighEventMs = new ConcurrentHashMap<>();
-        this.lastReactiveEventMs = new ConcurrentHashMap<>();
-        this.recentLowEventSignatures = new ConcurrentHashMap<>();
-        this.nextSpontMs = new ConcurrentHashMap<>();
-        this.dangerWarned = new ConcurrentHashMap<>();
-        this.lowHealthWarned = new ConcurrentHashMap<>();
-        this.lowFoodWarned = new ConcurrentHashMap<>();
-        this.lastBiome = new ConcurrentHashMap<>();
-        this.lastDimension = new ConcurrentHashMap<>();
-        this.playerLanguage = new ConcurrentHashMap<>();
-        this.awaitingName = Collections.synchronizedSet(new HashSet<>());
-        this.pendingGreeting = Collections.synchronizedSet(new HashSet<>());
-        this.pendingPersonality = Collections.synchronizedSet(new HashSet<>());
-        this.highInProcessPlayers = Collections.synchronizedSet(new HashSet<>());
-    }
+    private Blackboard() {}
 
     public static synchronized Blackboard getInstance() {
-        if (instance == null) {
-            instance = new Blackboard();
-        }
+        if (instance == null) instance = new Blackboard();
         return instance;
     }
 
+    // --- GESTIÓN DE EVENTOS ---
+
     public void publishEvent(BotEvent event) {
-        if (isDuplicateLowEvent(event)) {
-            LOGGER.debug("Evento LOW duplicado ignorado: {} para jugador {}", event.prompt(), event.playerUuid());
-            return;
-        }
+        if (isDuplicateLowEvent(event)) return;
+        UUID uuid = event.playerUuid();
+        if (event.impact() != BotEvent.Impact.HIGH && hasHighPendingOrProcessing(uuid)) return;
 
-        if (event.impact() != BotEvent.Impact.HIGH
-                && !isRegistrationEvent(event.prompt())
-                && hasHighPendingOrProcessing(event.playerUuid())) {
-            LOGGER.debug("Evento {} ignorado por HIGH pendiente/procesando para jugador {}", event.impact(), event.playerUuid());
-            return;
-        }
+        PriorityBlockingQueue<BotEvent> queue = playerEventQueues.computeIfAbsent(uuid, k -> new PriorityBlockingQueue<>(INITIAL_QUEUE_CAPACITY));
+        if (queue.size() >= MAX_EVENTS_PER_PLAYER) queue.poll();
+        queue.offer(event);
+    }
 
-        cleanupOldEventsForPlayer(event.playerUuid(), event.impact());
-        eventQueue.offer(event);
-        LOGGER.info("Evento publicado: {} - {} para jugador {}", event.prompt(), event.impact(), event.playerUuid());
+    public boolean hasEventsForPlayer(UUID uuid) {
+        return playerEventQueues.containsKey(uuid) && !playerEventQueues.get(uuid).isEmpty();
+    }
+
+    public BotEvent pollEventForPlayer(UUID uuid) {
+        return playerEventQueues.containsKey(uuid) ? playerEventQueues.get(uuid).poll() : null;
+    }
+
+    public void clearNonEssentialEvents(UUID uuid) {
+        if (playerEventQueues.containsKey(uuid)) {
+            playerEventQueues.get(uuid).removeIf(e -> e.impact() != BotEvent.Impact.HIGH && !e.neverIgnore());
+        }
     }
 
     private boolean isDuplicateLowEvent(BotEvent event) {
-        if (event.impact() != BotEvent.Impact.LOW) {
-            return false;
-        }
-
+        if (event.impact() != BotEvent.Impact.LOW) return false;
+        String sig = event.playerUuid() + "|" + event.prompt().toLowerCase().trim();
         long now = System.currentTimeMillis();
-        recentLowEventSignatures.entrySet().removeIf(entry -> (now - entry.getValue()) > LOW_EVENT_DEDUPE_MS);
-
-        String normalizedPrompt = event.prompt()
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("\\s+", " ")
-                .trim();
-        String signature = event.playerUuid() + "|" + normalizedPrompt;
-
-        Long lastTime = recentLowEventSignatures.get(signature);
-        if (lastTime != null && (now - lastTime) < LOW_EVENT_DEDUPE_MS) {
-            return true;
-        }
-
-        recentLowEventSignatures.put(signature, now);
+        if (recentLowEventSignatures.containsKey(sig) && (now - recentLowEventSignatures.get(sig)) < LOW_EVENT_DEDUPE_MS) return true;
+        recentLowEventSignatures.put(sig, now);
         return false;
     }
 
-    public BotEvent pollEvent() {
-        BotEvent event = eventQueue.poll();
-        if (event != null) {
-            LOGGER.debug("Evento extraído de cola: {}", event.prompt());
-        }
-        return event;
-    }
-
-    public boolean hasEvents() {
-        boolean has = !eventQueue.isEmpty();
-        if (has) {
-            LOGGER.debug("Cola tiene {} eventos", eventQueue.size());
-        }
-        return has;
-    }
-
-    private void cleanupOldEventsForPlayer(UUID playerUuid, BotEvent.Impact newEventImpact) {
-        List<BotEvent> playerEvents = new ArrayList<>();
-        List<BotEvent> otherEvents = new ArrayList<>();
-
-        List<BotEvent> allEvents = new ArrayList<>();
-        eventQueue.drainTo(allEvents);
-
-        for (BotEvent event : allEvents) {
-            if (event.playerUuid().equals(playerUuid)) {
-                if (newEventImpact == BotEvent.Impact.HIGH
-                        && event.impact() != BotEvent.Impact.HIGH
-                        && !isRegistrationEvent(event.prompt())) {
-                    continue;
-                }
-                playerEvents.add(event);
-            } else {
-                otherEvents.add(event);
-            }
-        }
-
-        if (playerEvents.size() >= MAX_EVENTS_PER_PLAYER) {
-            playerEvents.sort(Comparator.comparingInt((BotEvent e) -> e.impact().getPriority()).reversed());
-            playerEvents = playerEvents.subList(0, MAX_EVENTS_PER_PLAYER - 1);
-        }
-
-        eventQueue.addAll(otherEvents);
-        eventQueue.addAll(playerEvents);
-    }
-
-    public void markHighProcessing(UUID playerUuid) {
-        highInProcessPlayers.add(playerUuid);
-    }
-
-    public void clearHighProcessing(UUID playerUuid) {
-        highInProcessPlayers.remove(playerUuid);
-    }
-
-    public boolean hasHighPendingOrProcessing(UUID playerUuid) {
-        if (highInProcessPlayers.contains(playerUuid)) {
-            return true;
-        }
-        for (BotEvent event : eventQueue) {
-            if (event.playerUuid().equals(playerUuid) && event.impact() == BotEvent.Impact.HIGH) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isRegistrationEvent(String prompt) {
-        return prompt.startsWith("GREETING_") || prompt.startsWith("CHAT_NAME_RECEIVED:");
-    }
-
-
-    public void clearEventQueue() {
-        eventQueue.clear();
-    }
-
-    public void setCurrentServer(MinecraftServer server) {
-        this.currentServer = server;
-    }
-
-    public MinecraftServer getCurrentServer() {
-        return currentServer;
-    }
-
-    public void setBotData(JsonObject data) {
-        synchronized (dataLock) {
-            this.botData = data;
-        }
-    }
-
-    public JsonObject getBotData() {
-        synchronized (dataLock) {
-            return botData;
-        }
-    }
-
-    public boolean hasPersonality() {
-        synchronized (dataLock) {
-            return botData != null && botData.has("personality");
-        }
-    }
-
-    public JsonObject getPersonality() {
-        synchronized (dataLock) {
-            if (botData != null && botData.has("personality")) {
-                return botData.getAsJsonObject("personality");
-            }
-            return null;
-        }
-    }
-
-    public String getBotName() {
-        JsonObject personality = getPersonality();
-        if (personality != null && personality.has("name")) {
-            return personality.get("name").getAsString();
-        }
-        return "Bot";
-    }
-
-    public JsonObject getPlayers() {
-        synchronized (dataLock) {
-            if (botData != null && botData.has("players")) {
-                return botData.getAsJsonObject("players");
-            }
-            return new JsonObject();
-        }
-    }
+    // --- GESTIÓN DE DATOS Y PERSONALIDAD ---
 
     public boolean hasPlayer(String uuid) {
         synchronized (dataLock) {
-            if (botData == null || !botData.has("players")) return false;
-            return botData.getAsJsonObject("players").has(uuid);
+            return botData != null && botData.has("players") && botData.getAsJsonObject("players").has(uuid);
         }
     }
 
-    public JsonObject getPlayerData(String uuid) {
+    public boolean hasPlayerPersonality(String uuid) {
         synchronized (dataLock) {
-            if (botData == null || !botData.has("players")) return null;
-            JsonObject players = botData.getAsJsonObject("players");
-            if (players.has(uuid)) {
-                return players.getAsJsonObject(uuid);
-            }
-            return null;
+            return hasPlayer(uuid) && botData.getAsJsonObject("players").getAsJsonObject(uuid).has("personality");
         }
     }
 
-    public String getPlayerName(String uuid) {
-        JsonObject playerData = getPlayerData(uuid);
-        if (playerData != null && playerData.has("name")) {
-            return playerData.get("name").getAsString();
-        }
-        return null;
-    }
-
-    public JsonArray getPlayerHistory(String uuid) {
-        JsonObject playerData = getPlayerData(uuid);
-        if (playerData != null && playerData.has("history")) {
-            return playerData.getAsJsonArray("history").deepCopy();
-        }
-        return new JsonArray();
-    }
-
-    public void addPlayerHistory(String uuid, String role, String content, int maxHistory) {
-        synchronized (dataLock) {
-            if (botData == null || !botData.has("players")) return;
-            JsonObject players = botData.getAsJsonObject("players");
-            if (!players.has(uuid)) return;
-
-            JsonObject pd = players.getAsJsonObject(uuid);
-            JsonArray history = pd.has("history") ? pd.getAsJsonArray("history") : new JsonArray();
-
-            JsonObject entry = new JsonObject();
-            entry.addProperty("role", role);
-            entry.addProperty("content", content);
-            history.add(entry);
-
-            while (history.size() > maxHistory * 2) {
-                history.remove(0);
-            }
-            pd.add("history", history);
-        }
-    }
-
-    public void registerNewPlayer(String uuid, String name) {
+    public void setPlayerPersonality(String uuid, JsonObject personality) {
         synchronized (dataLock) {
             if (botData == null) return;
             JsonObject players = botData.has("players") ? botData.getAsJsonObject("players") : new JsonObject();
-
-            if (players.has(uuid)) {
-                // Preservar datos existentes (personalidad, historial)
-                JsonObject existing = players.getAsJsonObject(uuid);
-                existing.addProperty("name", name);
-                if (!existing.has("history")) {
-                    existing.add("history", new JsonArray());
-                }
-            } else {
-                JsonObject newPlayer = new JsonObject();
-                newPlayer.addProperty("name", name);
-                newPlayer.add("history", new JsonArray());
-                players.add(uuid, newPlayer);
-            }
-
+            JsonObject pd = players.has(uuid) ? players.getAsJsonObject(uuid) : new JsonObject();
+            pd.add("personality", personality);
+            players.add(uuid, pd);
             botData.add("players", players);
         }
     }
 
-    /**
-     * Obtiene la personalidad específica de un jugador, o la global si no tiene.
-     */
     public JsonObject getPersonalityForPlayer(String uuid) {
         synchronized (dataLock) {
-            // Primero verificar si el jugador tiene personalidad propia
-            JsonObject playerData = getPlayerData(uuid);
-            if (playerData != null && playerData.has("personality")) {
-                return playerData.getAsJsonObject("personality");
-            }
-            // Si no, usar la personalidad global del mundo
-            return getPersonality();
-        }
-    }
-
-    /**
-     * Verifica si un jugador tiene personalidad propia asignada.
-     */
-    public boolean hasPlayerPersonality(String uuid) {
-        synchronized (dataLock) {
-            JsonObject playerData = getPlayerData(uuid);
-            return playerData != null && playerData.has("personality");
-        }
-    }
-
-    /**
-     * Asigna una personalidad específica a un jugador.
-     */
-    public void setPlayerPersonality(String uuid, JsonObject personality) {
-        synchronized (dataLock) {
-            if (botData == null || !botData.has("players")) return;
-            JsonObject players = botData.getAsJsonObject("players");
-            if (!players.has(uuid)) {
-                // Crear entrada de jugador si no existe
-                JsonObject newPlayer = new JsonObject();
-                newPlayer.add("history", new JsonArray());
-                newPlayer.add("personality", personality);
-                players.add(uuid, newPlayer);
-            } else {
-                JsonObject pd = players.getAsJsonObject(uuid);
-                pd.add("personality", personality);
-            }
-        }
-    }
-
-    /**
-     * Verifica si se necesita generar personalidad para un jugador.
-     * Retorna true si el jugador es nuevo y no tiene personalidad.
-     */
-    public boolean needsPersonalityGeneration(String uuid) {
-        synchronized (dataLock) {
-            if (!hasPlayer(uuid)) return true;
-            return !hasPlayerPersonality(uuid);
+            if (hasPlayerPersonality(uuid)) return botData.getAsJsonObject("players").getAsJsonObject(uuid).getAsJsonObject("personality");
+            return (botData != null && botData.has("personality")) ? botData.getAsJsonObject("personality") : null;
         }
     }
 
     public void setPersonality(JsonObject personality) {
         synchronized (dataLock) {
-            if (botData == null) {
-                botData = new JsonObject();
-                botData.add("players", new JsonObject());
-            }
+            if (botData == null) botData = new JsonObject();
             botData.add("personality", personality);
         }
     }
 
-    public long getLastSpontaneousMs(String uuid) {
-        return lastSpontaneousMs.getOrDefault(uuid, 0L);
-    }
+    // --- CONTROL DE ADVERTENCIAS ---
 
-    public void setLastSpontaneousMs(String uuid, long timeMs) {
-        lastSpontaneousMs.put(uuid, timeMs);
-    }
+    public boolean isDangerWarned(String uuid) { return dangerWarned.getOrDefault(uuid, false); }
+    public void setDangerWarned(String uuid, boolean warned) { dangerWarned.put(uuid, warned); }
 
-    public long getLastHighEventMs(String uuid) {
-        return lastHighEventMs.getOrDefault(uuid, 0L);
-    }
+    public boolean isLowHealthWarned(String uuid) { return lowHealthWarned.getOrDefault(uuid, false); }
+    public void setLowHealthWarned(String uuid, boolean warned) { lowHealthWarned.put(uuid, warned); }
 
-    public void setLastHighEventMs(String uuid, long timeMs) {
-        lastHighEventMs.put(uuid, timeMs);
-    }
+    public boolean isLowFoodWarned(String uuid) { return lowFoodWarned.getOrDefault(uuid, false); }
+    public void setLowFoodWarned(String uuid, boolean warned) { lowFoodWarned.put(uuid, warned); }
 
-    public long getLastReactiveEventMs(String uuid) {
-        return lastReactiveEventMs.getOrDefault(uuid, 0L);
-    }
+    public String getLastBiome(String uuid) { return lastBiome.get(uuid); }
+    public void setLastBiome(String uuid, String biome) { lastBiome.put(uuid, biome); }
 
-    public void setLastReactiveEventMs(String uuid, long timeMs) {
-        lastReactiveEventMs.put(uuid, timeMs);
-    }
+    // --- CONTROL DE FLUJO ---
 
-    public Long getNextSpontMs(String uuid) {
-        return nextSpontMs.get(uuid);
-    }
+    public boolean isAwaitingName(String uuid) { return awaitingName.contains(uuid); }
+    public void addAwaitingName(String uuid) { awaitingName.add(uuid); }
+    public void removeAwaitingName(String uuid) { awaitingName.remove(uuid); }
 
-    public void setNextSpontMs(String uuid, long timeMs) {
-        nextSpontMs.put(uuid, timeMs);
-    }
+    public boolean isPendingGreeting(String uuid) { return pendingGreeting.contains(uuid); }
+    public void addPendingGreeting(String uuid) { pendingGreeting.add(uuid); }
+    public Set<String> getPendingGreetings() { return pendingGreeting; }
+    public void clearPendingGreetings() { pendingGreeting.clear(); }
 
-    public boolean isDangerWarned(String uuid) {
-        return dangerWarned.getOrDefault(uuid, false);
-    }
+    public boolean isPendingPersonality(String uuid) { return pendingPersonality.contains(uuid); }
+    public void addPendingPersonality(String uuid) { pendingPersonality.add(uuid); }
+    public void removePendingPersonality(String uuid) { pendingPersonality.remove(uuid); }
 
-    public void setDangerWarned(String uuid, boolean warned) {
-        dangerWarned.put(uuid, warned);
-    }
+    // --- HISTORIAL Y NOMBRES ---
 
-    public boolean isLowHealthWarned(String uuid) {
-        return lowHealthWarned.getOrDefault(uuid, false);
-    }
-
-    public void setLowHealthWarned(String uuid, boolean warned) {
-        lowHealthWarned.put(uuid, warned);
-    }
-
-    public boolean isLowFoodWarned(String uuid) {
-        return lowFoodWarned.getOrDefault(uuid, false);
-    }
-
-    public void setLowFoodWarned(String uuid, boolean warned) {
-        lowFoodWarned.put(uuid, warned);
-    }
-
-    public String getLastBiome(String uuid) {
-        return lastBiome.get(uuid);
-    }
-
-    public void setLastBiome(String uuid, String biome) {
-        lastBiome.put(uuid, biome);
-    }
-
-    public String getLastDimension(String uuid) {
-        return lastDimension.get(uuid);
-    }
-
-    public void setLastDimension(String uuid, String dimension) {
-        lastDimension.put(uuid, dimension);
-    }
-
-    public boolean isAwaitingName(String uuid) {
-        return awaitingName.contains(uuid);
-    }
-
-    public void addAwaitingName(String uuid) {
-        awaitingName.add(uuid);
-    }
-
-    public void removeAwaitingName(String uuid) {
-        awaitingName.remove(uuid);
-    }
-
-    public boolean isPendingGreeting(String uuid) {
-        return pendingGreeting.contains(uuid);
-    }
-
-    public void addPendingGreeting(String uuid) {
-        pendingGreeting.add(uuid);
-    }
-
-    public void removePendingGreeting(String uuid) {
-        pendingGreeting.remove(uuid);
-    }
-
-    public Set<String> getPendingGreetings() {
-        synchronized (pendingGreeting) {
-            return new HashSet<>(pendingGreeting);
+    public String getPlayerName(String uuid) {
+        synchronized (dataLock) {
+            if (!hasPlayer(uuid)) return null;
+            JsonObject pd = botData.getAsJsonObject("players").getAsJsonObject(uuid);
+            return pd.has("name") ? pd.get("name").getAsString() : null;
         }
     }
 
-    public void clearPendingGreetings() {
-        pendingGreeting.clear();
-    }
-
-    // Métodos para personalidad pendiente por jugador
-    public boolean isPendingPersonality(String uuid) {
-        return pendingPersonality.contains(uuid);
-    }
-
-    public void addPendingPersonality(String uuid) {
-        pendingPersonality.add(uuid);
-    }
-
-    public void removePendingPersonality(String uuid) {
-        pendingPersonality.remove(uuid);
-    }
-
-    public Set<String> getPendingPersonalities() {
-        synchronized (pendingPersonality) {
-            return new HashSet<>(pendingPersonality);
+    public JsonArray getPlayerHistory(String uuid) {
+        synchronized (dataLock) {
+            if (!hasPlayer(uuid)) return new JsonArray();
+            JsonObject pd = botData.getAsJsonObject("players").getAsJsonObject(uuid);
+            return pd.has("history") ? pd.getAsJsonArray("history").deepCopy() : new JsonArray();
         }
     }
 
-    public long getLastDayTime() {
-        return lastDayTime;
+    public void addPlayerHistory(String uuid, String role, String content, int max) {
+        synchronized (dataLock) {
+            if (!hasPlayer(uuid)) return;
+            JsonObject pd = botData.getAsJsonObject("players").getAsJsonObject(uuid);
+            JsonArray history = pd.has("history") ? pd.getAsJsonArray("history") : new JsonArray();
+            JsonObject entry = new JsonObject();
+            entry.addProperty("role", role);
+            entry.addProperty("content", content);
+            history.add(entry);
+            while (history.size() > max * 2) history.remove(0);
+            pd.add("history", history);
+        }
     }
 
-    public void setLastDayTime(long dayTime) {
-        this.lastDayTime = dayTime;
+    // --- ESTADO DE PROCESAMIENTO ---
+
+    public void markHighProcessing(UUID uuid) { highInProcessPlayers.add(uuid); }
+    public void clearHighProcessing(UUID uuid) { highInProcessPlayers.remove(uuid); }
+    public boolean hasHighPendingOrProcessing(UUID uuid) {
+        if (highInProcessPlayers.contains(uuid)) return true;
+        PriorityBlockingQueue<BotEvent> q = playerEventQueues.get(uuid);
+        return q != null && q.stream().anyMatch(e -> e.impact() == BotEvent.Impact.HIGH);
     }
 
-    public boolean wasRaining() {
-        return wasRaining;
-    }
+    public void setBotData(JsonObject data) { synchronized (dataLock) { this.botData = data; } }
+    public JsonObject getBotData() { synchronized (dataLock) { return botData; } }
+    public String getPlayerLanguage(String uuid) { return playerLanguage.getOrDefault(uuid, serverLanguage); }
+    public void setPlayerLanguage(String uuid, String language) { playerLanguage.put(uuid, language); }
+    public String getServerLanguage() { return serverLanguage; }
 
-    public void setWasRaining(boolean raining) {
-        this.wasRaining = raining;
+    // Métodos que registran jugadores y proveen datos solicitados por observers
+    public void registerNewPlayer(String uuid, String name) {
+        synchronized (dataLock) {
+            if (botData == null) botData = new JsonObject();
+            JsonObject players = botData.has("players") ? botData.getAsJsonObject("players") : new JsonObject();
+            JsonObject pd = players.has(uuid) ? players.getAsJsonObject(uuid) : new JsonObject();
+            if (name != null && !name.isEmpty()) pd.addProperty("name", name);
+            players.add(uuid, pd);
+            botData.add("players", players);
+        }
     }
+    public void setLastReactiveEventMs(String uuid, long t) { lastReactiveEventMs.put(uuid, t); }
+    public long getLastReactiveEventMs(String uuid) { return lastReactiveEventMs.getOrDefault(uuid, 0L); }
+    public void setLastHighEventMs(String uuid, long t) { lastHighEventMs.put(uuid, t); }
+    public long getLastHighEventMs(String uuid) { return lastHighEventMs.getOrDefault(uuid, 0L); }
+    public void setCurrentServer(MinecraftServer s) { this.currentServer = s; }
+    public MinecraftServer getCurrentServer() { return currentServer; }
+    public Long getNextSpontMs(String uuid) { return nextSpontMs.get(uuid); }
+    public void setNextSpontMs(String uuid, long time) { nextSpontMs.put(uuid, time); }
 
-    public boolean wasThundering() {
-        return wasThundering;
-    }
+    // Estado del mundo (consultado por WorldObserver)
+    public long getLastDayTime() { return lastDayTime; }
+    public boolean wasRaining() { return wasRainingFlag; }
+    public boolean wasThundering() { return wasThunderingFlag; }
+    public void setLastDayTime(long t) { this.lastDayTime = t; }
+    public void setWasRaining(boolean r) { this.wasRainingFlag = r; }
+    public void setWasThundering(boolean t) { this.wasThunderingFlag = t; }
 
-    public void setWasThundering(boolean thundering) {
-        this.wasThundering = thundering;
-    }
+    public String getLastDimension(String uuid) { return lastDimension.get(uuid); }
+    public void setLastDimension(String uuid, String dim) { lastDimension.put(uuid, dim); }
 
-    // Manejo de idiomas
-    public String getPlayerLanguage(String uuid) {
-        return playerLanguage.getOrDefault(uuid, serverLanguage);
-    }
-
-    public void setPlayerLanguage(String uuid, String language) {
-        playerLanguage.put(uuid, language);
-    }
-
-    public String getServerLanguage() {
-        return serverLanguage;
-    }
-
-    public void setServerLanguage(String language) {
-        this.serverLanguage = language;
-    }
+    // Estado general de personalidad
+    public boolean hasPersonality() { synchronized (dataLock) { return botData != null && botData.has("personality"); } }
+    public String getBotName() { synchronized (dataLock) { if (botData != null && botData.has("name")) return botData.get("name").getAsString(); return "ZanateNunchi"; } }
 
     public void clearAllState() {
-        eventQueue.clear();
+        playerEventQueues.clear();
         awaitingName.clear();
         pendingGreeting.clear();
         pendingPersonality.clear();
         highInProcessPlayers.clear();
-        lastSpontaneousMs.clear();
-        lastHighEventMs.clear();
-        lastReactiveEventMs.clear();
-        recentLowEventSignatures.clear();
-        nextSpontMs.clear();
         dangerWarned.clear();
         lowHealthWarned.clear();
         lowFoodWarned.clear();
         lastBiome.clear();
-        lastDimension.clear();
-        playerLanguage.clear();
-        lastDayTime = -1;
-        wasRaining = false;
-        wasThundering = false;
         LOGGER.info("Estado del Blackboard limpiado");
     }
 }
-
-

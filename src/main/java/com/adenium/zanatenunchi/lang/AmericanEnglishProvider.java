@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class AmericanEnglishProvider implements IBotLanguageProvider {
 
     @Override
@@ -142,5 +144,40 @@ public class AmericanEnglishProvider implements IBotLanguageProvider {
             default -> "it's midnight";
         };
         return String.format("Context: %s is in %s, %s, biome: %s. Health: %d, food: %d/20. Say something spontaneous and natural about this situation.", playerName, dimension, timeDesc, biome, hearts, food);
+    }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) {
+        return String.format("[%s fallback] %s: I don't have enough context right now to give a full reply. Keep it short and natural.", impact != null ? impact.name() : "NONE", playerName);
+    }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) {
+        return String.format("Immediate danger: %s is near %s (approx %d blocks). %s has %d hearts — warn them urgently to run or hide.", mobs, playerName, distance, playerName, hearts);
+    }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) {
+        String src = fromChat ? "from chat" : "from system";
+        return String.format("Timeout (%s): %s, couldn't process in time. Reply briefly.", src, playerName);
+    }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("sarcastic") || t.contains("ironic") || t.contains("sarcástic")) return "Oh great, another one. So, who are you?";
+            if (t.contains("shy") || t.contains("introvert") || t.contains("tímid")) return "Um... hey. I don't think we've met. What's your name?";
+            if (t.contains("brave") || t.contains("bold") || t.contains("valiente")) return "Hey! New around here? Tell me your name!";
+            if (t.contains("cheerful") || t.contains("extrovert") || t.contains("alegre")) return "Hey there!! What's your name? 😄";
+            if (t.contains("lazy") || t.contains("chill") || t.contains("perezos")) return "Oh, someone new... so who are you?";
+            return "Hey! What's your name?";
+        }
+        if (t.contains("sarcastic") || t.contains("ironic") || t.contains("sarcástic")) return "Oh look who decided to show up... " + playerName + ".";
+        if (t.contains("shy") || t.contains("introvert") || t.contains("tímid")) return "Oh, " + playerName + "... glad you're back.";
+        if (t.contains("brave") || t.contains("bold") || t.contains("valiente")) return playerName + "! Let's go, ready for action!";
+        if (t.contains("cheerful") || t.contains("extrovert") || t.contains("alegre")) return playerName + "!! So good to see you again! 🎉";
+        if (t.contains("lazy") || t.contains("chill") || t.contains("perezos")) return "Oh, " + playerName + "... took you long enough.";
+        return "Welcome back, " + playerName + "!";
     }
 }

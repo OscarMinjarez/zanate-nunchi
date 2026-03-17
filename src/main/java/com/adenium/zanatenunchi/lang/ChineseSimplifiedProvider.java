@@ -1,5 +1,7 @@
 package com.adenium.zanatenunchi.lang;
 
+import com.adenium.zanatenunchi.blackboard.BotEvent;
+
 public class ChineseSimplifiedProvider implements IBotLanguageProvider {
 
     @Override
@@ -120,6 +122,31 @@ public class ChineseSimplifiedProvider implements IBotLanguageProvider {
     @Override
     public String getLowFoodEvent(String playerName) {
         return String.format("事件: %s 快要饿死了！提醒他吃东西。", playerName);
+    }
+
+    @Override
+    public String getFallbackReply(BotEvent.Impact impact, String playerName) { return String.format("[%s 回退] %s: 目前没有足够的上下文来完整回复。简短即可。", impact != null ? impact.name() : "NONE", playerName); }
+
+    @Override
+    public String getImmediateDangerReply(String mobs, int hearts, int distance, String playerName) { return String.format("紧急危险: %s 靠近 %s(约 %d 格)。%s 剩余 %d 心 — 立即警告并撤离。", mobs, playerName, distance, playerName, hearts); }
+
+    @Override
+    public String getTimeoutReply(BotEvent.Impact impact, String playerName, boolean fromChat) { String src = fromChat ? "来自聊天" : "来自系统"; return String.format("超时 (%s): %s，未能及时处理。简短回复。", src, playerName); }
+
+    @Override
+    public String getDeterministicGreeting(String playerName, boolean isNew, String traits) {
+        String t = (traits != null) ? traits.toLowerCase() : "";
+        if (isNew) {
+            if (t.contains("讽刺") || t.contains("sarcástic")) return "哦，又来一个……你是谁？";
+            if (t.contains("害羞") || t.contains("内向") || t.contains("tímid")) return "嗯……你好。你叫什么名字？";
+            if (t.contains("勇敢") || t.contains("valiente")) return "嘿！新来的？告诉我你的名字！";
+            if (t.contains("开朗") || t.contains("外向") || t.contains("alegre")) return "你好呀！！你叫什么名字？😄";
+            return "你好！你叫什么名字？";
+        }
+        if (t.contains("讽刺") || t.contains("sarcástic")) return "看看谁回来了……" + playerName + "。";
+        if (t.contains("害羞") || t.contains("内向") || t.contains("tímid")) return "哦，" + playerName + "……很高兴你回来了。";
+        if (t.contains("开朗") || t.contains("外向") || t.contains("alegre")) return playerName + "！！又见到你太开心了！🎉";
+        return "欢迎回来，" + playerName + "！";
     }
 }
 
