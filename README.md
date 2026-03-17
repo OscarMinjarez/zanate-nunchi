@@ -76,7 +76,7 @@ Si juegas en multijugador, ¡cada jugador en el servidor de Fabric tendrá su pr
 
 Consulta la documentación completa de comandos aquí:
 
-[📋 Ver comandos y ejemplos de uso](./COMANDOS.md)
+[📋 Ver comandos y ejemplos de uso](./COMMANDS.md)
 
 ---
 
